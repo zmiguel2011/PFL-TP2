@@ -1,2 +1,4 @@
 # PFL-TP2
- Project developed as part of a PFL (Functional and Logic Programming) course @FEUP
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Uporto FEUP](https://img.shields.io/badge/UPorto-FEUP-brown)](https://fe.up.pt)
