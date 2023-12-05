@@ -1,3 +1,6 @@
+import Data.List (sort, intercalate)
+
+
 -- PFL 2023/24 - Haskell practical assignment quickstart
 
 -- Part 1
@@ -8,18 +11,23 @@ data Inst =
   Branch Code Code | Loop Code Code
   deriving Show
 type Code = [Inst]
+type Stack = [Integer]
+type State = [(String, Integer)]
 
--- createEmptyStack :: Stack
-createEmptyStack = undefined -- TODO, Uncomment the function signature after defining Stack
+createEmptyStack :: Stack
+createEmptyStack = []
 
 -- stack2Str :: Stack -> String
 stack2Str = undefined -- TODO, Uncomment all the other function type declarations as you implement them
 
--- createEmptyState :: State
-createEmptyState = undefined -- TODO, Uncomment the function signature after defining State
+createEmptyState :: State
+createEmptyState = []
 
--- state2Str :: State -> String
-state2Str = undefined -- TODO
+state2Str :: State -> String
+state2Str state = intercalate "," [var ++ "=" ++ show val | (var, val) <- sortedState]
+  where
+    sortedState = sort state
+
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
 run = undefined -- TODO
