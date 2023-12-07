@@ -11,9 +11,11 @@ data Inst =
   Branch Code Code | Loop Code Code
   deriving Show
 type Code = [Inst]
-type Stack = [Integer]
-type Variable = Either Integer Inst
-type State = [(String, Variable)]
+
+type Variable = String
+type Value = Either Integer Bool
+type Stack = [Value]
+type State = [(Variable, Value)]
 
 createEmptyStack :: Stack
 createEmptyStack = []
@@ -29,9 +31,8 @@ state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sor
   where
     sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
     showVal (Left intVal) = show intVal
-    showVal (Right Tru) = "True"
-    showVal (Right Fals) = "False"
-
+    showVal (Right True) = "True"
+    showVal (Right False) = "False"
 
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
