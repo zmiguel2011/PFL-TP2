@@ -43,6 +43,21 @@ isEmpty _  = False
 createEmptyStack :: Stack
 createEmptyStack = []
 
+-- MACHINE INSTRUCTION FUNCTIONS --
+
+calc :: Stack -> String -> Stack
+calc stk arg    -- the pattern clause MyInt x <- top stk ensures the top of stack is in fact an Integer (MyInt)
+  | arg == "+", MyInt x <- top stk = push (MyInt (x + intValue (top popStack))) finalStack
+  | arg == "*", MyInt x <- top stk = push (MyInt (x * intValue (top popStack))) finalStack
+  | arg == "-", MyInt x <- top stk = push (MyInt (x - intValue (top popStack))) finalStack
+  | otherwise = error "Invalid operation or operands"
+  where
+    intValue (MyInt x) = x
+    intValue _         = error "Invalid operand type"
+    popStack           = pop stk
+    finalStack         = pop popStack
+
+
 -- Auxiliary function for the fetch-x operation
 fetchVar :: Variable -> Stack -> State -> (Stack, State)
 fetchVar var stack state
@@ -52,11 +67,11 @@ fetchVar var stack state
 -- Auxiliary function for the store-x operation
 storeVar :: Variable -> Stack -> State -> (Stack, State)
 storeVar var stack state
-  | isEmpty stack          = error "Not enough operands for store operation or empty stack"
-  | otherwise           = (newStack, (var, val) : state)
+  | isEmpty stack = error "Not enough operands for store operation or empty stack"
+  | otherwise     = (newStack, (var, val) : state)
   where
-    val = top stack
-    newStack = pop stack
+    val           = top stack
+    newStack      = pop stack
 
 
 -- stack2Str :: Stack -> String
@@ -68,9 +83,9 @@ createEmptyState = []
 state2Str :: State -> String
 state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
-    sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
+    sortedState            = sortBy (\(var, _) (val, _) -> compare var val) state
     showVal (MyInt intVal) = show intVal
-    showVal (MyBool True) = "True"
+    showVal (MyBool True)  = "True"
     showVal (MyBool False) = "False"
 
 
