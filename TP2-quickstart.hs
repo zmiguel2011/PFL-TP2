@@ -17,7 +17,6 @@ data Value = MyInt Integer | MyBool Bool deriving Show
 type Stack = [Value]
 type State = [(Variable, Value)]
 
-
 -- STACK FUNCTIONS --
 
 -- Auxiliary function for push an element to the stack
@@ -39,12 +38,10 @@ isEmpty :: Stack -> Bool
 isEmpty [] = True
 isEmpty _  = False
 
--- Auxiliary function to create an empty stack
-createEmptyStack :: Stack
-createEmptyStack = []
 
 -- MACHINE INSTRUCTION FUNCTIONS --
 
+-- Auxiliary function to calculate and push the result of add, mult and sub operations onto the stack
 calc :: Stack -> String -> Stack
 calc stk arg    -- the pattern clause MyInt x <- top stk ensures the top of stack is in fact an Integer (MyInt)
   | arg == "+", MyInt x <- top stk = push (MyInt (x + intValue (top popStack))) finalStack
@@ -74,6 +71,11 @@ storeVar var stack state
     newStack      = pop stack
 
 
+
+-- Auxiliary function to create an empty stack
+createEmptyStack :: Stack
+createEmptyStack = []
+
 -- stack2Str :: Stack -> String
 stack2Str = undefined -- TODO, Uncomment all the other function type declarations as you implement them
 
@@ -87,7 +89,6 @@ state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sor
     showVal (MyInt intVal) = show intVal
     showVal (MyBool True)  = "True"
     showVal (MyBool False) = "False"
-
 
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
