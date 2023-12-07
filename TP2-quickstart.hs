@@ -13,12 +13,51 @@ data Inst =
 type Code = [Inst]
 
 type Variable = String
-type Value = Either Integer Bool
+data Value = MyInt Integer | MyBool Bool deriving Show
 type Stack = [Value]
 type State = [(Variable, Value)]
 
+
+-- STACK FUNCTIONS --
+
+-- Auxiliary function for push an element to the stack
+push :: Value -> Stack -> Stack
+push x xs = x:xs
+
+-- Auxiliary function to pop the first element
+pop :: Stack -> Stack
+pop (x:xs) = xs
+pop _      = error "pop: empty stack"
+
+-- Auxiliary function to retrieve the top element
+top :: Stack -> Value
+top (x:_) = x
+top _     = error "top: empty stack"
+
+-- Auxiliary function to check whether the stack is empty
+isEmpty :: Stack -> Bool
+isEmpty [] = True
+isEmpty _  = False
+
+-- Auxiliary function to create an empty stack
 createEmptyStack :: Stack
 createEmptyStack = []
+
+-- Auxiliary function for the fetch-x operation
+fetchVar :: Variable -> Stack -> State -> (Stack, State)
+fetchVar var stack state
+  | Just value <- lookup var state = (push value stack, state)
+  | otherwise                      = error $ "Variable not found: " ++ var
+
+-- Auxiliary function for the store-x operation
+storeVar :: Variable -> Stack -> State -> (Stack, State)
+storeVar var stack state
+  | isEmpty stack          = error "Not enough operands for store operation or empty stack"
+  | otherwise           = (newStack, (var, val) : state)
+  where
+    val = top stack
+    newStack = pop stack
+
 
 -- stack2Str :: Stack -> String
 stack2Str = undefined -- TODO, Uncomment all the other function type declarations as you implement them
@@ -30,9 +69,10 @@ state2Str :: State -> String
 state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
     sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
-    showVal (Left intVal) = show intVal
-    showVal (Right True) = "True"
-    showVal (Right False) = "False"
+    showVal (MyInt intVal) = show intVal
+    showVal (MyBool True) = "True"
+    showVal (MyBool False) = "False"
+
 
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
