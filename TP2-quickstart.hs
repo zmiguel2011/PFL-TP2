@@ -1,4 +1,4 @@
-import Data.List (sort, intercalate)
+import Data.List (sortBy, intercalate)
 
 
 -- PFL 2023/24 - Haskell practical assignment quickstart
@@ -12,7 +12,8 @@ data Inst =
   deriving Show
 type Code = [Inst]
 type Stack = [Integer]
-type State = [(String, Integer)]
+type Variable = Either Integer Inst
+type State = [(String, Variable)]
 
 createEmptyStack :: Stack
 createEmptyStack = []
@@ -24,9 +25,13 @@ createEmptyState :: State
 createEmptyState = []
 
 state2Str :: State -> String
-state2Str state = intercalate "," [var ++ "=" ++ show val | (var, val) <- sortedState]
+state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
-    sortedState = sort state
+    sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
+    showVal (Left intVal) = show intVal
+    showVal (Right Tru) = "True"
+    showVal (Right Fals) = "False"
+
 
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
