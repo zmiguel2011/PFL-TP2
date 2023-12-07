@@ -47,10 +47,15 @@ calc stk arg    -- the pattern clause MyInt x <- top stk ensures the top of stac
   | arg == "+", MyInt x <- top stk = push (MyInt (x + intValue (top popStack))) finalStack
   | arg == "*", MyInt x <- top stk = push (MyInt (x * intValue (top popStack))) finalStack
   | arg == "-", MyInt x <- top stk = push (MyInt (x - intValue (top popStack))) finalStack
+  | arg == "==", MyInt x <- top stk = push (MyBool (x == intValue (top popStack))) finalStack
+  | arg == "==", MyBool x <- top stk = push (MyBool (x == boolValue (top popStack))) finalStack
+  | arg == "<=", MyInt x <- top stk = push (MyBool (x <= intValue (top popStack))) finalStack
   | otherwise = error "Invalid operation or operands"
   where
     intValue (MyInt x) = x
     intValue _         = error "Invalid operand type"
+    boolValue (MyBool x) = x
+    boolValue _         = error "Invalid operand type"
     popStack           = pop stk
     finalStack         = pop popStack
 
