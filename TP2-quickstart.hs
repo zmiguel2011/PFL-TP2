@@ -62,10 +62,13 @@ calc stk arg    -- the pattern guard MyInt x <- top stk ensures the top of stack
     finalStack           = pop popStack
 
 
+removeVar :: Variable -> [(Variable, Value)] -> [(Variable, Value)]
+removeVar key = filter ((key /=) . fst)
+
 -- Auxiliary function for the fetch-x operation
 fetchVar :: Variable -> Stack -> State -> (Stack, State)
 fetchVar var stack state
-  | Just value <- lookup var state = (push value stack, state)
+  | Just value <- lookup var state = (push value stack, removeVar var state)
   | otherwise                      = error $ "Variable not found: " ++ var
 
 -- Auxiliary function for the store-x operation
@@ -110,20 +113,21 @@ run (inst:code, stack, state) = case inst of
   Le -> run (code, calc stack "<=", state)
   And -> run (code, calc stack "&&", state)
   Neg -> run (code, calc stack "neg", state)
-  Fetch var -> let (newStack, newState) = fetchVar var stack state
-             in run (code, newStack, newState)
-  Store var -> let (newStack, newState) = storeVar var stack state
-             in run (code, newStack, newState)
+  Fetch var -> fetch var
+  Store var -> store var
   Noop -> run (code, stack, state)
   Branch c1 c2 -> branch c1 c2
-  Loop c1 c2 -> loop c1 c2
+  Loop c1 c2 -> run (c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]] ++ code, stack, state)
   where
+    fetch var = let (newStack, newState) = fetchVar var stack state
+                in run (code, newStack, newState)
+    store var = let (newStack, newState) = storeVar var stack state
+                in run (code, newStack, newState)
     branch c1 c2 = case pop stack of
       (MyBool True):newStack -> run (c1 ++ code, newStack, state)
       (MyBool False):newStack -> run (c2 ++ code, newStack, state)
       _ -> error "Invalid value on the stack for branch"
 
-    loop c1 c2 = run (Branch (c1 ++ [Loop c1 c2]) [Noop] : code, stack, state)
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
