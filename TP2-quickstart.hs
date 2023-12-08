@@ -43,21 +43,23 @@ isEmpty _  = False
 
 -- Auxiliary function to calculate and push the result of add, mult and sub operations onto the stack
 calc :: Stack -> String -> Stack
-calc stk arg    -- the pattern clause MyInt x <- top stk ensures the top of stack is in fact an Integer (MyInt)
+calc stk arg    -- the pattern guard MyInt x <- top stk ensures the top of stack is in fact an Integer (MyInt)
   | arg == "+", MyInt x <- top stk = push (MyInt (x + intValue (top popStack))) finalStack
   | arg == "*", MyInt x <- top stk = push (MyInt (x * intValue (top popStack))) finalStack
   | arg == "-", MyInt x <- top stk = push (MyInt (x - intValue (top popStack))) finalStack
   | arg == "==", MyInt x <- top stk = push (MyBool (x == intValue (top popStack))) finalStack
   | arg == "==", MyBool x <- top stk = push (MyBool (x == boolValue (top popStack))) finalStack
   | arg == "<=", MyInt x <- top stk = push (MyBool (x <= intValue (top popStack))) finalStack
+  | arg == "&&", MyBool x <- top stk = push (MyBool (x && boolValue (top popStack))) finalStack
+  | arg == "neg", MyBool x <- top stk = push (MyBool (not x)) popStack
   | otherwise = error "Invalid operation or operands"
   where
-    intValue (MyInt x) = x
-    intValue _         = error "Invalid operand type"
+    intValue (MyInt x)   = x
+    intValue _           = error "Invalid operand type"
     boolValue (MyBool x) = x
-    boolValue _         = error "Invalid operand type"
-    popStack           = pop stk
-    finalStack         = pop popStack
+    boolValue _          = error "Invalid operand type"
+    popStack             = pop stk
+    finalStack           = pop popStack
 
 
 -- Auxiliary function for the fetch-x operation
@@ -74,7 +76,6 @@ storeVar var stack state
   where
     val           = top stack
     newStack      = pop stack
-
 
 
 -- Auxiliary function to create an empty stack
@@ -96,8 +97,33 @@ state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sor
     showVal (MyBool False) = "False"
 
 
--- run :: (Code, Stack, State) -> (Code, Stack, State)
-run = undefined -- TODO
+run :: (Code, Stack, State) -> (Code, Stack, State)
+run ([], stack, state) = ([], stack, state)
+run (inst:code, stack, state) = case inst of
+  Push n -> run (code, push (MyInt n) stack, state)
+  Add -> run (code, calc stack "+", state)
+  Mult -> run (code, calc stack "*", state)
+  Sub -> run (code, calc stack "-", state)
+  Tru -> run (code, push (MyBool True) stack, state)
+  Fals -> run (code, push (MyBool False) stack, state)
+  Equ -> run (code, calc stack "==", state)
+  Le -> run (code, calc stack "<=", state)
+  And -> run (code, calc stack "&&", state)
+  Neg -> run (code, calc stack "neg", state)
+  Fetch var -> let (newStack, newState) = fetchVar var stack state
+             in run (code, newStack, newState)
+  Store var -> let (newStack, newState) = storeVar var stack state
+             in run (code, newStack, newState)
+  Noop -> run (code, stack, state)
+  Branch c1 c2 -> branch c1 c2
+  Loop c1 c2 -> loop c1 c2
+  where
+    branch c1 c2 = case pop stack of
+      (MyBool True):newStack -> run (c1 ++ code, newStack, state)
+      (MyBool False):newStack -> run (c2 ++ code, newStack, state)
+      _ -> error "Invalid value on the stack for branch"
+
+    loop c1 c2 = run (Branch (c1 ++ [Loop c1 c2]) [Noop] : code, stack, state)
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
