@@ -85,8 +85,16 @@ storeVar var stack state
 createEmptyStack :: Stack
 createEmptyStack = []
 
--- stack2Str :: Stack -> String
-stack2Str = undefined -- TODO, Uncomment all the other function type declarations as you implement them
+-- Auxiliary function to extract the actual value from a Value data type
+showVal :: Value -> String
+showVal (MyInt intVal) = show intVal
+showVal (MyBool True)  = "True"
+showVal (MyBool False) = "False"
+
+stack2Str :: Stack -> String
+stack2Str [] = ""
+stack2Str [x] = showVal x
+stack2Str (x:xs) = showVal x ++ "," ++ stack2Str xs  
 
 createEmptyState :: State
 createEmptyState = []
@@ -95,9 +103,6 @@ state2Str :: State -> String
 state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
     sortedState            = sortBy (\(var, _) (val, _) -> compare var val) state
-    showVal (MyInt intVal) = show intVal
-    showVal (MyBool True)  = "True"
-    showVal (MyBool False) = "False"
 
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
