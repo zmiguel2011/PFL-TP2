@@ -61,25 +61,29 @@ calc stk arg    -- the pattern guard MyInt x <- top stk ensures the top of stack
     popStack             = pop stk
     finalStack           = pop popStack
 
-
+-- Auxiliary function to remove a Variable-Value pair in State
 removeVar :: Variable -> [(Variable, Value)] -> [(Variable, Value)]
 removeVar key = filter ((key /=) . fst)
+
+-- Auxiliary function to update a Variable-Value pair in State
+updateVar :: Variable -> Value -> [(Variable, Value)] -> [(Variable, Value)]
+updateVar key val = ((key, val) :) . removeVar key
 
 -- Auxiliary function for the fetch-x operation
 fetchVar :: Variable -> Stack -> State -> (Stack, State)
 fetchVar var stack state
-  | Just value <- lookup var state = (push value stack, removeVar var state)
+  | Just value <- lookup var state = (push value stack, state)
   | otherwise                      = error $ "Variable not found: " ++ var
 
 -- Auxiliary function for the store-x operation
 storeVar :: Variable -> Stack -> State -> (Stack, State)
 storeVar var stack state
   | isEmpty stack = error "Not enough operands for store operation or empty stack"
-  | otherwise     = (newStack, (var, val) : state)
+  | Just _ <- lookup var state = (newStack, updateVar var val state)
+  | otherwise                  = (newStack, (var, val) : state)
   where
     val           = top stack
     newStack      = pop stack
-
 
 -- Auxiliary function to create an empty stack
 createEmptyStack :: Stack
@@ -91,18 +95,21 @@ showVal (MyInt intVal) = show intVal
 showVal (MyBool True)  = "True"
 showVal (MyBool False) = "False"
 
+-- Auxiliary function to convert the stack to a string
 stack2Str :: Stack -> String
-stack2Str [] = ""
-stack2Str [x] = showVal x
+stack2Str []     = ""
+stack2Str [x]    = showVal x
 stack2Str (x:xs) = showVal x ++ "," ++ stack2Str xs  
 
+-- Auxiliary function to create an empty stack
 createEmptyState :: State
 createEmptyState = []
 
+-- Auxiliary function to convert the state to a string
 state2Str :: State -> String
 state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
-    sortedState            = sortBy (\(var, _) (val, _) -> compare var val) state
+    sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
 
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
@@ -128,10 +135,12 @@ run (inst:code, stack, state) = case inst of
                 in run (code, newStack, newState)
     store var = let (newStack, newState) = storeVar var stack state
                 in run (code, newStack, newState)
-    branch c1 c2 = case pop stack of
-      (MyBool True):newStack -> run (c1 ++ code, newStack, state)
-      (MyBool False):newStack -> run (c2 ++ code, newStack, state)
-      _ -> error "Invalid value on the stack for branch"
+    branch c1 c2
+      | MyBool True <- top stack = run (c1 ++ code, newStack, state)
+      | MyBool False <- top stack = run (c2 ++ code, newStack, state)
+      | otherwise = error "Invalid value on the stack for branch"
+      where
+        newStack = pop stack
 
 
 -- To help you test your assembler
@@ -152,16 +161,56 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 -- Part 2
 
--- TODO: Define the types Aexp, Bexp, Stm and Program
+-- Data type for arithmetic expressions
+data Aexp
+  = Var String                  -- Variable
+  | Num Integer                 -- Numeric constant
+  | AddA Aexp Aexp              -- Addition
+  | SubA Aexp Aexp              -- Subtraction
+  | MultA Aexp Aexp             -- Multiplication
+  deriving Show
 
--- compA :: Aexp -> Code
-compA = undefined -- TODO
+-- Data type for boolean expressions
+data Bexp
+  = TrueB                       -- Boolean True
+  | FalseB                      -- Boolean False
+  | Equal Aexp Aexp             -- Equality comparison
+  | LessEqual Aexp Aexp         -- Less than or equal comparison
+  | Not Bexp                    -- Negation
+  deriving Show
 
--- compB :: Bexp -> Code
-compB = undefined -- TODO
+-- Data type for statements
+data Stm
+  = Assign String Aexp          -- Assignment: var := Aexp
+  | Seq Stm Stm                 -- Sequence of statements: Stm1 ; Stm2
+  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
+  | While Bexp Stm              -- While loop: while Bexp do Stm
+  deriving Show
 
--- compile :: Program -> Code
-compile = undefined -- TODO
+-- COMPILER FUNCTIONS --
+
+-- Compiler for arithmetic expressions (Aexp) into machine instructions (Code)
+compA :: Aexp -> Code
+compA (Var var)         = [Fetch var]
+compA (Num n)           = [Push n]
+compA (AddA a1 a2)      = compA a2 ++ compA a1 ++ [Add]
+compA (SubA a1 a2)      = compA a2 ++ compA a1 ++ [Sub]
+compA (MultA a1 a2)     = compA a2 ++ compA a1 ++ [Mult]
+
+-- Compiler for boolean expressions (Bexp) into machine instructions (Code)
+compB :: Bexp -> Code
+compB TrueB             = [Tru]
+compB FalseB            = [Fals]
+compB (Equal a1 a2)     = compA a2 ++ compA a1 ++ [Equ]
+compB (LessEqual a1 a2) = compA a2 ++ compA a1 ++ [Le]
+compB (Not b1)          = compB b1 ++ [Neg]
+
+-- Compiler for statements (Stm) into machine instructions (Code)
+compile :: Stm -> Code
+compile (Assign var aexp)   = compA aexp ++ [Store var]
+compile (Seq stm1 stm2)     = compile stm1 ++ compile stm2
+compile (If bexp stm1 stm2) = compB bexp ++ [Branch (compile stm1) (compile stm2)]
+compile (While bexp stm)    = [Loop (compB bexp) (compile stm)]
 
 -- parse :: String -> Program
 parse = undefined -- TODO
