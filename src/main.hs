@@ -1,20 +1,25 @@
 import Data.List (sortBy, intercalate)
 
-
--- PFL 2023/24 - Haskell practical assignment quickstart
-
 -- Part 1
 
--- Do not modify our definition of Inst and Code
+-- Data type for machine instructions
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
-  deriving Show
+  deriving (Show)
+-- Data type for machine code
 type Code = [Inst]
 
+-- Data type for variables
 type Variable = String
-data Value = MyInt Integer | MyBool Bool deriving Show
+-- Data type for values
+data Value 
+  = MyInt Integer 
+  | MyBool Bool 
+  deriving (Show)
+-- Data type for the machine stack
 type Stack = [Value]
+-- Data type for the machine state (storage)
 type State = [(Variable, Value)]
 
 -- STACK FUNCTIONS --
@@ -111,7 +116,7 @@ state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sor
   where
     sortedState = sortBy (\(var, _) (val, _) -> compare var val) state
 
-
+-- Main function to interpret the code and run the instructions, returning the stack and the output values in the storage
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst:code, stack, state) = case inst of
@@ -168,7 +173,7 @@ data Aexp
   | AddA Aexp Aexp              -- Addition
   | SubA Aexp Aexp              -- Subtraction
   | MultA Aexp Aexp             -- Multiplication
-  deriving Show
+  deriving (Show)
 
 -- Data type for boolean expressions
 data Bexp
@@ -177,7 +182,7 @@ data Bexp
   | Equal Aexp Aexp             -- Equality comparison
   | LessEqual Aexp Aexp         -- Less than or equal comparison
   | Not Bexp                    -- Negation
-  deriving Show
+  deriving (Show)
 
 -- Data type for statements
 data Stm
@@ -185,7 +190,7 @@ data Stm
   | Seq Stm Stm                 -- Sequence of statements: Stm1 ; Stm2
   | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
   | While Bexp Stm              -- While loop: while Bexp do Stm
-  deriving Show
+  deriving (Show)
 
 -- COMPILER FUNCTIONS --
 
@@ -212,7 +217,7 @@ compile (Seq stm1 stm2)     = compile stm1 ++ compile stm2
 compile (If bexp stm1 stm2) = compB bexp ++ [Branch (compile stm1) (compile stm2)]
 compile (While bexp stm)    = [Loop (compB bexp) (compile stm)]
 
--- parse :: String -> Program
+-- parse :: String -> [Stm]
 parse = undefined -- TODO
 
 -- To help you test your parser
