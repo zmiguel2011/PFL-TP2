@@ -57,7 +57,7 @@ calc stk arg    -- the pattern guard MyInt x <- top stk ensures the top of stack
   | arg == "<=", MyInt x <- top stk = push (MyBool (x <= intValue (top popStack))) finalStack
   | arg == "&&", MyBool x <- top stk = push (MyBool (x && boolValue (top popStack))) finalStack
   | arg == "neg", MyBool x <- top stk = push (MyBool (not x)) popStack
-  | otherwise = error "Invalid operation or operands"
+  | otherwise = error "Run-time error"
   where
     intValue (MyInt x)   = x
     intValue _           = error "Invalid operand type"
@@ -143,7 +143,7 @@ run (inst:code, stack, state) = case inst of
     branch c1 c2
       | MyBool True <- top stack = run (c1 ++ code, newStack, state)
       | MyBool False <- top stack = run (c2 ++ code, newStack, state)
-      | otherwise = error "Invalid value on the stack for branch"
+      | otherwise = error "Run-time error"
       where
         newStack = pop stack
 
@@ -163,6 +163,12 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- testAssembler [Push (-20),Push (-21), Le] == ("True","")
 -- testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
 -- testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+-- If you test:
+-- testAssembler [Push 1,Push 2,And]
+-- You should get an exception with the string: "Run-time error"
+-- If you test:
+-- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
+-- You should get an exception with the string: "Run-time error"
 
 -- Part 2
 
