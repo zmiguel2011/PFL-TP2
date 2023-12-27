@@ -78,12 +78,12 @@ updateVar key val = ((key, val) :) . removeVar key
 fetchVar :: Variable -> Stack -> State -> (Stack, State)
 fetchVar var stack state
   | Just value <- lookup var state = (push value stack, state)
-  | otherwise                      = error $ "Variable not found: " ++ var
+  | otherwise                      = error "Run-time error"
 
 -- Auxiliary function for the store-x operation
 storeVar :: Variable -> Stack -> State -> (Stack, State)
 storeVar var stack state
-  | isEmpty stack = error "Not enough operands for store operation or empty stack"
+  | isEmpty stack = error "Run-time error"
   | Just _ <- lookup var state = (newStack, updateVar var val state)
   | otherwise                  = (newStack, (var, val) : state)
   where
