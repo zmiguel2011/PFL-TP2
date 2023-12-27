@@ -7,7 +7,7 @@ import Data.Text.Internal.Read (digitToInt)
 
 -- Data type for machine instructions
 data Inst =
-  Push Int | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
+  Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
   deriving (Show)
 -- Data type for machine code
@@ -17,7 +17,7 @@ type Code = [Inst]
 type Variable = String
 -- Data type for values
 data Value 
-  = MyInt Int 
+  = MyInt Integer 
   | MyBool Bool 
   deriving (Show)
 -- Data type for the machine stack
@@ -218,7 +218,7 @@ data Token
   | ElseTok
   | WhileTok
   | DoTok
-  | IntTok Int
+  | IntTok Integer
   | BoolTok Bool
   | VarTok String
   deriving (Show)
@@ -248,13 +248,11 @@ lexer ('F' : 'a' : 'l' : 's' : 'e' : restStr) = BoolTok False : lexer restStr
 lexer (chr : restStr)
   | isSpace chr = lexer restStr
 lexer str@(chr : _)
-  | isDigit chr = IntTok (stringToInt digitStr) : lexer restStr
+  | isDigit chr = IntTok (read digitStr :: Integer) : lexer restStr
   | isLetter chr = VarTok varStr : lexer restStr2
   where
     (digitStr, restStr) = break (not . isDigit) str
     (varStr, restStr2)   = break (not . isLetter) str
-    -- convert a string to an integer
-    stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
   -- runtime error:
 lexer (_ : restString)
   = error ("unexpected character: '" ++ "'")
@@ -262,7 +260,7 @@ lexer (_ : restString)
 -- Data type for arithmetic expressions
 data Aexp
   = Var String                  -- Variable
-  | Num Int                 -- Numeric constant
+  | Num Integer                 -- Numeric constant
   | AddA Aexp Aexp              -- Addition
   | SubA Aexp Aexp              -- Subtraction
   | MultA Aexp Aexp             -- Multiplication
@@ -285,44 +283,36 @@ data Stm
   | While Bexp Stm              -- While loop: while Bexp do Stm
   deriving (Show)
 
-data Expr
-  = VarX String
-  | NumX Int
-  | AssignX String Expr
-  | AddX Expr Expr
-  | SubX Expr Expr
-  | MultX Expr Expr
-  deriving (Show)
 
 -- parse :: String -> [Stm]
-parse :: [Token] -> Expr
+parse :: [Token] -> [Stm]
 parse tokens =
   case parseStm tokens of
     Just (expr, []) -> expr
     _ -> error "Parse error"
 
-parseInt :: [Token] -> Maybe (Expr, [Token])
-parseInt (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseInt :: [Token] -> Maybe ([Stm], [Token])
+parseInt (IntTok n : restTokens) = Just (Num n, restTokens)
 parseInt tokens = Nothing
 
-parseProdOrInt :: [Token] -> Maybe (Expr, [Token])
+parseProdOrInt :: [Token] -> Maybe ([Stm], [Token])
 parseProdOrInt tokens = case parseInt tokens of
   Just (expr1, (TimesTok : restTokens1)) ->
     case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (MultX expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
-parseSumOrProdOrInt :: [Token] -> Maybe (Expr, [Token])
+parseSumOrProdOrInt :: [Token] -> Maybe ([Stm], [Token])
 parseSumOrProdOrInt tokens = case parseProdOrInt tokens of
   Just (expr1, (PlusTok : restTokens1)) ->
     case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
-parseIntOrParenExpr :: [Token] -> Maybe (Expr, [Token])
-parseIntOrParenExpr (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseIntOrParenExpr :: [Token] -> Maybe ([Stm], [Token])
+parseIntOrParenExpr (IntTok n : restTokens) = Just (Num n, restTokens)
 parseIntOrParenExpr (OpenTok : restTokens1) =
   case parseSumOrProdOrIntOrPar restTokens1 of
     Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
@@ -330,27 +320,27 @@ parseIntOrParenExpr (OpenTok : restTokens1) =
     Nothing -> Nothing
 parseIntOrParenExpr tokens = Nothing
 
-parseProdOrIntOrPar :: [Token] -> Maybe (Expr, [Token])
+parseProdOrIntOrPar :: [Token] -> Maybe ([Stm], [Token])
 parseProdOrIntOrPar tokens = case parseIntOrParenExpr tokens of
   Just (expr1, (TimesTok : restTokens1)) ->
     case parseProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (MultX expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
-parseSumOrProdOrIntOrPar :: [Token] -> Maybe (Expr, [Token])
+parseSumOrProdOrIntOrPar :: [Token] -> Maybe ([Stm], [Token])
 parseSumOrProdOrIntOrPar tokens = case parseProdOrIntOrPar tokens of
   Just (expr1, (PlusTok : restTokens1)) ->
     case parseSumOrProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
 -- Parsing Logic for Statements
-parseStm :: [Token] -> Maybe (Expr, [Token])
+parseStm :: [Token] -> Maybe ([Stm], [Token])
 parseStm (VarTok var : AssignTok : restTokens1) =
   case parseSumOrProdOrIntOrPar restTokens1 of
-    Just (expr, restTokens2) -> Just (AssignX var expr, restTokens2)
+    Just (expr, restTokens2) -> Just (Assign var expr, restTokens2)
     Nothing -> Nothing
 
 
