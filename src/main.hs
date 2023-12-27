@@ -301,12 +301,13 @@ parse tokens =
     Just (expr, []) -> expr
     _ -> error "Parse error"
 
-parseInt :: [Token] -> Maybe (Expr, [Token])
-parseInt (IntTok n : restTokens) = Just (NumX n, restTokens)
-parseInt tokens = Nothing
+parseIntOrVar :: [Token] -> Maybe (Expr, [Token])
+parseIntOrVar (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseIntOrVar (VarTok n : restTokens) = Just (VarX n, restTokens)
+parseIntOrVar tokens = Nothing
 
 parseProdOrInt :: [Token] -> Maybe (Expr, [Token])
-parseProdOrInt tokens = case parseInt tokens of
+parseProdOrInt tokens = case parseIntOrVar tokens of
   Just (expr1, (TimesTok : restTokens1)) ->
     case parseProdOrInt restTokens1 of
       Just (expr2, restTokens2) -> Just (MultX expr1 expr2, restTokens2)
@@ -315,14 +316,19 @@ parseProdOrInt tokens = case parseInt tokens of
 
 parseSumOrProdOrInt :: [Token] -> Maybe (Expr, [Token])
 parseSumOrProdOrInt tokens = case parseProdOrInt tokens of
-  Just (expr1, (PlusTok : restTokens1)) ->
+  Just (expr1, PlusTok : restTokens1) ->
     case parseProdOrInt restTokens1 of
       Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  Just (expr1, SubTok : restTokens1) ->
+    case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (SubX expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
 parseIntOrParenExpr :: [Token] -> Maybe (Expr, [Token])
 parseIntOrParenExpr (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseIntOrParenExpr (VarTok n : restTokens) = Just (VarX n, restTokens)
 parseIntOrParenExpr (OpenTok : restTokens1) =
   case parseSumOrProdOrIntOrPar restTokens1 of
     Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
