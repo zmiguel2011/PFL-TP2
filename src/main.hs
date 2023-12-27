@@ -1,10 +1,13 @@
-import Data.List (sortBy, intercalate)
+import Data.List (sortBy, intercalate, isSuffixOf)
+import Text.Read (read)
+import Data.Char (isDigit, isSpace, chr, isLetter)
+import Data.Text.Internal.Read (digitToInt)
 
 -- Part 1
 
 -- Data type for machine instructions
 data Inst =
-  Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
+  Push Int | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
   deriving (Show)
 -- Data type for machine code
@@ -14,7 +17,7 @@ type Code = [Inst]
 type Variable = String
 -- Data type for values
 data Value 
-  = MyInt Integer 
+  = MyInt Int 
   | MyBool Bool 
   deriving (Show)
 -- Data type for the machine stack
@@ -172,31 +175,6 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 -- Part 2
 
--- Data type for arithmetic expressions
-data Aexp
-  = Var String                  -- Variable
-  | Num Integer                 -- Numeric constant
-  | AddA Aexp Aexp              -- Addition
-  | SubA Aexp Aexp              -- Subtraction
-  | MultA Aexp Aexp             -- Multiplication
-  deriving (Show)
-
--- Data type for boolean expressions
-data Bexp
-  = TrueB                       -- Boolean True
-  | FalseB                      -- Boolean False
-  | Equal Aexp Aexp             -- Equality comparison
-  | LessEqual Aexp Aexp         -- Less than or equal comparison
-  | Not Bexp                    -- Negation
-  deriving (Show)
-
--- Data type for statements
-data Stm
-  = Assign String Aexp          -- Assignment: var := Aexp
-  | Seq Stm Stm                 -- Sequence of statements: Stm1 ; Stm2
-  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
-  | While Bexp Stm              -- While loop: while Bexp do Stm
-  deriving (Show)
 
 -- COMPILER FUNCTIONS --
 
@@ -223,13 +201,166 @@ compile (Seq stm1 stm2)     = compile stm1 ++ compile stm2
 compile (If bexp stm1 stm2) = compB bexp ++ [Branch (compile stm1) (compile stm2)]
 compile (While bexp stm)    = [Loop (compB bexp) (compile stm)]
 
--- parse :: String -> [Stm]
-parse = undefined -- TODO
+data Token
+  = PlusTok
+  | SubTok
+  | TimesTok
+  | NotTok
+  | OpenTok
+  | CloseTok
+  | EqualBoolTok
+  | EqualIntTok
+  | LessEqualTok
+  | AssignTok
+  | AndTok
+  | IfTok
+  | ThenTok
+  | ElseTok
+  | WhileTok
+  | DoTok
+  | IntTok Int
+  | BoolTok Bool
+  | VarTok String
+  deriving (Show)
 
+-- Lexer function to split the string into a list of words (tokens)
+lexer :: String -> [Token]
+lexer [] = []
+lexer ('+' : restStr) = PlusTok : lexer restStr
+lexer ('-' : restStr) = SubTok : lexer restStr
+lexer ('*' : restStr) = TimesTok : lexer restStr
+lexer ('(' : restStr) = OpenTok : lexer restStr
+lexer (')' : restStr) = CloseTok : lexer restStr
+lexer (':' : '=' : restStr) = AssignTok : lexer restStr
+lexer (';' : restStr) = lexer restStr
+lexer ('=' : '=' : restStr) = EqualIntTok : lexer restStr
+lexer ('=' : restStr) = EqualBoolTok : lexer restStr
+lexer ('<' : '=' : restStr) = LessEqualTok : lexer restStr
+lexer ('i' : 'f' : restStr) = IfTok : lexer restStr
+lexer ('t' : 'h' : 'e' : 'n' : restStr) = ThenTok : lexer restStr
+lexer ('e' : 'l' : 's' : 'e' : restStr) = ElseTok : lexer restStr
+lexer ('n' : 'o' : 't' : restStr) = NotTok : lexer restStr
+lexer ('a' : 'n' : 'd' : restStr) = AndTok : lexer restStr
+lexer ('d' : 'o' : restStr) = DoTok : lexer restStr
+lexer ('w' : 'h' : 'i' : 'l' : 'e' : restStr) = WhileTok : lexer restStr
+lexer ('T' : 'r' : 'u' : 'e' : restStr) = BoolTok True : lexer restStr
+lexer ('F' : 'a' : 'l' : 's' : 'e' : restStr) = BoolTok False : lexer restStr
+lexer (chr : restStr)
+  | isSpace chr = lexer restStr
+lexer str@(chr : _)
+  | isDigit chr = IntTok (stringToInt digitStr) : lexer restStr
+  | isLetter chr = VarTok varStr : lexer restStr2
+  where
+    (digitStr, restStr) = break (not . isDigit) str
+    (varStr, restStr2)   = break (not . isLetter) str
+    -- convert a string to an integer
+    stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
+  -- runtime error:
+lexer (_ : restString)
+  = error ("unexpected character: '" ++ "'")
+
+-- Data type for arithmetic expressions
+data Aexp
+  = Var String                  -- Variable
+  | Num Int                 -- Numeric constant
+  | AddA Aexp Aexp              -- Addition
+  | SubA Aexp Aexp              -- Subtraction
+  | MultA Aexp Aexp             -- Multiplication
+  deriving (Show)
+
+-- Data type for boolean expressions
+data Bexp
+  = TrueB                       -- Boolean True
+  | FalseB                      -- Boolean False
+  | Equal Aexp Aexp             -- Equality comparison
+  | LessEqual Aexp Aexp         -- Less than or equal comparison
+  | Not Bexp                    -- Negation
+  deriving (Show)
+
+-- Data type for statements
+data Stm
+  = Assign String Aexp          -- Assignment: var := Aexp
+  | Seq Stm Stm                 -- Sequence of statements: Stm1 ; Stm2
+  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
+  | While Bexp Stm              -- While loop: while Bexp do Stm
+  deriving (Show)
+
+data Expr
+  = VarX String
+  | NumX Int
+  | AssignX String Expr
+  | AddX Expr Expr
+  | SubX Expr Expr
+  | MultX Expr Expr
+  deriving (Show)
+
+-- parse :: String -> [Stm]
+parse :: [Token] -> Expr
+parse tokens =
+  case parseStm tokens of
+    Just (expr, []) -> expr
+    _ -> error "Parse error"
+
+parseInt :: [Token] -> Maybe (Expr, [Token])
+parseInt (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseInt tokens = Nothing
+
+parseProdOrInt :: [Token] -> Maybe (Expr, [Token])
+parseProdOrInt tokens = case parseInt tokens of
+  Just (expr1, (TimesTok : restTokens1)) ->
+    case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (MultX expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  result -> result
+
+parseSumOrProdOrInt :: [Token] -> Maybe (Expr, [Token])
+parseSumOrProdOrInt tokens = case parseProdOrInt tokens of
+  Just (expr1, (PlusTok : restTokens1)) ->
+    case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  result -> result
+
+parseIntOrParenExpr :: [Token] -> Maybe (Expr, [Token])
+parseIntOrParenExpr (IntTok n : restTokens) = Just (NumX n, restTokens)
+parseIntOrParenExpr (OpenTok : restTokens1) =
+  case parseSumOrProdOrIntOrPar restTokens1 of
+    Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
+    Just _ -> Nothing -- no closing paren
+    Nothing -> Nothing
+parseIntOrParenExpr tokens = Nothing
+
+parseProdOrIntOrPar :: [Token] -> Maybe (Expr, [Token])
+parseProdOrIntOrPar tokens = case parseIntOrParenExpr tokens of
+  Just (expr1, (TimesTok : restTokens1)) ->
+    case parseProdOrIntOrPar restTokens1 of
+      Just (expr2, restTokens2) -> Just (MultX expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  result -> result
+
+parseSumOrProdOrIntOrPar :: [Token] -> Maybe (Expr, [Token])
+parseSumOrProdOrIntOrPar tokens = case parseProdOrIntOrPar tokens of
+  Just (expr1, (PlusTok : restTokens1)) ->
+    case parseSumOrProdOrIntOrPar restTokens1 of
+      Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  result -> result
+
+-- Parsing Logic for Statements
+parseStm :: [Token] -> Maybe (Expr, [Token])
+parseStm (VarTok var : AssignTok : restTokens1) =
+  case parseSumOrProdOrIntOrPar restTokens1 of
+    Just (expr, restTokens2) -> Just (AssignX var expr, restTokens2)
+    Nothing -> Nothing
+
+
+
+{-
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
+-}
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
