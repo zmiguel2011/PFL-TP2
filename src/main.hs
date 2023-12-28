@@ -1,4 +1,4 @@
-import Data.List (sortBy, intercalate, isSuffixOf)
+import Data.List (sortBy, intercalate, isSuffixOf, elemIndex, isPrefixOf)
 import Text.Read (read)
 import Data.Char (isDigit, isSpace, chr, isLetter)
 import Data.Text.Internal.Read (digitToInt)
@@ -192,14 +192,17 @@ data Bexp
   | IntEqual Aexp Aexp          -- Integer Equality comparison
   | BoolEqual Bexp Bexp         -- Boolean Equality comparison
   | LessEqual Aexp Aexp         -- Less than or equal comparison
-  | Not Bexp                    -- Negation
+  | NegB Bexp                   -- Negation
   deriving (Show)
 
 -- Data type for statements
 data Stm
   = Assign String Aexp          -- Assignment: var := Aexp
-  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
-  | While Bexp Stm              -- While loop: while Bexp do Stm
+  | If Bexp [Stm] [Stm]         -- If-then-else statement: if Bexp then Stm1 else Stm2
+  | While Bexp [Stm]            -- While loop: while Bexp do Stm
+  | NoopStm 
+  | Aexp Aexp 
+  | Bexp Bexp
   deriving (Show)
 
 -- COMPILER FUNCTIONS --
@@ -208,195 +211,163 @@ data Stm
 compA :: Aexp -> Code
 compA (Var var)         = [Fetch var]
 compA (Num n)           = [Push n]
-compA (AddA a1 a2)      = compA a2 ++ compA a1 ++ [Add]
-compA (SubA a1 a2)      = compA a2 ++ compA a1 ++ [Sub]
-compA (MultA a1 a2)     = compA a2 ++ compA a1 ++ [Mult]
+compA (AddA a1 a2)      = compA a2 ++ compA a1 ++ [Add]  -- a2 comes before a1 because the stack is LIFO
+compA (SubA a1 a2)      = compA a2 ++ compA a1 ++ [Sub]  -- a2 comes before a1 because the stack is LIFO
+compA (MultA a1 a2)     = compA a2 ++ compA a1 ++ [Mult] -- a2 comes before a1 because the stack is LIFO
 
--- TODO add AND operation
 -- Compiler for boolean expressions (Bexp) into machine instructions (Code)
 compB :: Bexp -> Code
 compB TrueB             = [Tru]
 compB FalseB            = [Fals]
-compB (IntEqual a1 a2)     = compA a2 ++ compA a1 ++ [Equ]
-compB (BoolEqual b1 b2)     = compB b2 ++ compB b1 ++ [Equ]
-compB (LessEqual a1 a2) = compA a2 ++ compA a1 ++ [Le]
-compB (Not b1)          = compB b1 ++ [Neg]
+compB (AndB b1 b2)      = compB b2 ++ compB b1 ++ [And]  -- b2 comes before b1 because the stack is LIFO
+compB (IntEqual a1 a2)  = compA a2 ++ compA a1 ++ [Equ]  -- a2 comes before a1 because the stack is LIFO
+compB (BoolEqual b1 b2) = compB b2 ++ compB b1 ++ [Equ]  -- b2 comes before b1 because the stack is LIFO
+compB (LessEqual a1 a2) = compA a2 ++ compA a1 ++ [Le]   -- a2 comes before a1 because the stack is LIFO
+compB (NegB b1)         = compB b1 ++ [Neg]
 
 -- Compiler for statements (Stm) into machine instructions (Code)
-compileStm :: Stm -> Code
-compileStm (Assign var aexp)   = compA aexp ++ [Store var]
-compileStm (If bexp stm1 stm2) = compB bexp ++ [Branch (compileStm stm1) (compileStm stm2)]
-compileStm (While bexp stm)    = [Loop (compB bexp) (compileStm stm)]
-
--- Main compiler
 compile :: [Stm] -> Code
 compile [] = []
-compile (x:xs) = compileStm x ++ compile xs
+compile (stm:rest) = case stm of
+  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest
+  If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest
+  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest
+  Aexp aexp -> compA aexp ++ compile rest
+  Bexp bexp -> compB bexp ++ compile rest
 
-data Token
-  = PlusTok
-  | SubTok
-  | TimesTok
-  | NotTok
-  | OpenTok
-  | CloseTok
-  | EqualBoolTok
-  | EqualIntTok
-  | LessEqualTok
-  | AssignTok
-  | AndTok
-  | IfTok
-  | ThenTok
-  | ElseTok
-  | WhileTok
-  | DoTok
-  | IntTok Integer
-  | BoolTok Bool
-  | VarTok String
-  deriving (Show)
-
--- Lexer function to split the string into a list of words (tokens)
-lexer :: String -> [Token]
+-- Auxiliary function for parse. Receives a string and splits it into a list of tokens (as a list of strings)
+lexer :: String -> [String]
 lexer [] = []
-lexer ('+' : restStr) = PlusTok : lexer restStr
-lexer ('-' : restStr) = SubTok : lexer restStr
-lexer ('*' : restStr) = TimesTok : lexer restStr
-lexer ('(' : restStr) = OpenTok : lexer restStr
-lexer (')' : restStr) = CloseTok : lexer restStr
-lexer (':' : '=' : restStr) = AssignTok : lexer restStr
-lexer (';' : restStr) = lexer restStr
-lexer ('=' : '=' : restStr) = EqualIntTok : lexer restStr
-lexer ('=' : restStr) = EqualBoolTok : lexer restStr
-lexer ('<' : '=' : restStr) = LessEqualTok : lexer restStr
-lexer ('i' : 'f' : restStr) = IfTok : lexer restStr
-lexer ('t' : 'h' : 'e' : 'n' : restStr) = ThenTok : lexer restStr
-lexer ('e' : 'l' : 's' : 'e' : restStr) = ElseTok : lexer restStr
-lexer ('n' : 'o' : 't' : restStr) = NotTok : lexer restStr
-lexer ('a' : 'n' : 'd' : restStr) = AndTok : lexer restStr
-lexer ('d' : 'o' : restStr) = DoTok : lexer restStr
-lexer ('w' : 'h' : 'i' : 'l' : 'e' : restStr) = WhileTok : lexer restStr
-lexer ('T' : 'r' : 'u' : 'e' : restStr) = BoolTok True : lexer restStr
-lexer ('F' : 'a' : 'l' : 's' : 'e' : restStr) = BoolTok False : lexer restStr
-lexer (chr : restStr)
-  | isSpace chr = lexer restStr
-lexer str@(chr : _)
-  | isDigit chr = IntTok (read digitStr :: Integer) : lexer restStr
-  | isLetter chr = VarTok varStr : lexer restStr2
+lexer str
+    | isPrefixOf "<=" str = "<=" : lexer (drop 2 str) -- If the string starts with "<=", it will add it to the list of tokens and call lexer again with the rest of the string
+    | isPrefixOf "==" str = "==" : lexer (drop 2 str) -- If the string starts with "==", it will add it to the list of tokens and call lexer again with the rest of the string
+    | isPrefixOf ":=" str = ":=" : lexer (drop 2 str) -- If the string starts with ":=", it will add it to the list of tokens and call lexer again with the rest of the string
+    | otherwise = 
+    case head str of
+        ' ' -> lexer (tail str) -- We ignore spaces and call lexer again with the rest of the string
+        '(' -> "(" : lexer (tail str) -- If the string starts with "(", it will add it to the list of tokens and call lexer again with the rest of the string
+        ')' -> ")" : lexer (tail str) -- If the string starts with ")", it will add it to the list of tokens and call lexer again with the rest of the string
+        ';' -> ";" : lexer (tail str) -- If the string starts with ";", it will add it to the list of tokens and call lexer again with the rest of the string
+        '=' -> "=" : lexer (tail str) -- If the string starts with "=", it will add it to the list of tokens and call lexer again with the rest of the string
+        '+' -> "+" : lexer (tail str) -- If the string starts with "+", it will add it to the list of tokens and call lexer again with the rest of the string
+        '-' -> "-" : lexer (tail str) -- If the string starts with "-", it will add it to the list of tokens and call lexer again with the rest of the string
+        '*' -> "*" : lexer (tail str) -- If the string starts with "*", it will add it to the list of tokens and call lexer again with the rest of the string
+        _ -> (head str :
+            takeWhile (\x -> x /= ' ' && x /= '(' && x /= ')' && x /= ';' && x /= '=' && x /= '+' && x /= '-' && x /= '*' && x /= '<' && x /= ':') (tail str)) : -- While x is different of any of these, it will save them in it's own space
+            lexer (dropWhile (\x -> x /= ' ' && x /= '(' && x /= ')' && x /= ';' && x /= '=' && x /= '+' && x /= '-' && x /= '*' && x /= '<' && x /= ':') (tail str)) -- Skips over the rest of the characters of the string that aren't these, so it doesnt parse something like ["12", "2"]
+
+-- Receives a list of tokens (as a list of strings) and returns the built data program (as a list of statements)
+buildData :: [String] -> [Stm]
+buildData [] = []
+buildData list = do
+    case findNotInner [";"] list of -- It will look for the first ";" that's not nested or that belongs to an if statement
+        Just index -> do -- If it finds it
+            let (stm, rest) = splitAt index list -- It will split the list in two, before and after the first ";" that's not nested
+            if head stm == "(" then buildData (tail (init stm)) -- If it's actually multiple nested statements instead of just one
+            else case rest of
+                [_] -> [buildStm stm] -- If it's at the last statement
+                _ -> buildStm stm : buildData (tail rest) -- If it's not at the last statement, it will build the statement and call itself again with the rest of the list
+        Nothing -> buildData (tail (init list)) -- If it doesn't find it, it will remove the first and last element of the list (the parentheses) and call itself again (This is only reached when it receives multiple statements that are altogether in between parentheses)
+
+-- Builds a statement from a list of tokens that were already separated by buildData
+buildStm :: [String] -> Stm
+buildStm list = 
+    case head list of
+        "if" -> do -- If it finds an "if"
+            let (bexp, rest) = break (== "then") list -- It will split the list in two, before and after the "then", since before it has a boolean expression and after it has the statements
+            case findNotInner ["else"] (tail rest) of -- It will look for the first "else" that's not nested
+                Just index -> do -- If it finds it
+                    let (stm1, stm2) = splitAt index (tail rest) -- It will split the list (rest) in two, stm1 has the statements that belong to the "then" and stm2 has the statements after the "else"
+                    case head (tail stm2) of -- It will check if the first element of the statements of "else" is a "(" or not. In other words, if the "else" has multiple statements or not, if it does, they're handled by buildData, if not, buildStm can handle it. In any case, the statement of "then" are handled by buildData for ";" handling
+                        "(" -> If (buildBexp (tail bexp)) (buildData stm1) (buildData (tail stm2)) -- If it's a "(", it will return an If with the built bolean expression obtained, the built "then" statements (or statement) obtained and the "else" statements obtained (data)
+                        _ -> If (buildBexp (tail bexp)) (buildData stm1) [buildStm (tail stm2)] -- If it's not a "(", it will return an If with the built bolean expression obtained, the built "then" statements (or statement) obtained and the "else" statement obtained (it can be anything, even another if statement)
+        "while" -> do -- If it finds a "while"
+            let (bexp, stm) = break (== "do") list -- It will split the list in two, before and after the "do", since before it has a boolean expression and after it has the statements
+            case head (tail stm) of -- It will check if the first element of the statements of "do" is a "(" or not. In other words, if the "do" has multiple statements or not, if it does, they're handled by buildData, if not, buildStm can handle it.
+                "(" -> While (buildBexp (tail bexp)) (buildData (tail stm)) -- If it's a "(", it will return a While with the built bolean expression obtained and the built "do" statements obtained (data)
+                _ -> While (buildBexp (tail bexp)) [buildStm (tail stm)] -- If it's not a "(", it will return a While with the built bolean expression obtained and the built "do" statement obtained (it can be anything, even another while statement)
+        _ -> do -- If it's not an "if" or a "while"
+            let (var, aexp) = break (== ":=") list -- It will split the list in two, before and after the ":=", since before it has a variable and after it has an arithmetic expression
+            Assign (head var) (buildAexp (tail aexp)) -- It will return an Assign with the variable and the built arithmetic expression obtained
+
+-- Finds the first ocurrence in a list of tokens (as a list of strings), of any token inside a given list of tokens (e.g. ["+","-"]), that's not nested and returns it's index. A token is considered nested if it's between parentheses or inside an if statement
+findNotInner :: [String] -> [String] -> Maybe Int
+findNotInner targets = find 0 0 -- It will call the find function with depth 0, index 0 and the list of tokens
   where
-    (digitStr, restStr) = break (not . isDigit) str
-    (varStr, restStr2)   = break (not . isLetter) str
-  -- runtime error:
-lexer (_ : restString)
-  = error ("unexpected character: '" ++ "'")
+    find _ _ [] = Nothing -- If it reaches the end of the list or given an empty list, it will return Nothing
+    find depth index (x:rest) =
+        case x of
+        "(" -> find (depth + 1) (index + 1) rest -- If it finds a "(" it will increase the depth (as it's entering something nested) and the index
+        "then" -> find (depth + 1) (index + 1) rest -- If it finds a "then" it will increase the depth and the index (since it's inside the if statement)
+        ")" -> find (depth - 1) (index + 1) rest -- If it finds a ")" it will decrease the depth (as it's leaving something that it's nested) and the index
+        "else" | depth /= 0 -> find (depth - 1) (index + 1) rest -- If it finds a "else" it will decrease the depth (as it's the end of the if) and increase the index
+        _ -> do
+            if depth == 0 && (x `elem` targets) -- If it's not nested and it finds what it's looking for
+                then Just index -- It will return the index
+                else find depth (index + 1) rest -- If it's not what it's looking for, it will increase the index and keep looking
+
+-- Builds an arithmetic expression from a list of tokens
+buildAexp :: [String] -> Aexp
+buildAexp [expr] = if all isDigit expr then Num (read expr) else Var expr -- If it's a number, it will return a Num, otherwise it will return a Var so it accepts both
+buildAexp list = 
+    case findNotInner ["+","-"] (reverse list) of -- It will look for the last "+" or "-" that's not nested. It's done first because it has the least priority
+        Just reversedIndex -> do -- If it finds it
+            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "+" or "-" that's not nested, since it's reversed
+            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "+" or "-" that's not nested
+            if list!!index == "+" -- If it's a "+"
+                then AddA (buildAexp before) (buildAexp (tail after)) -- It will return an AddA with the built arithmetic expressions of both lists obtained (before and after the "+")
+                else SubA (buildAexp before) (buildAexp (tail after)) -- If it's a "-", it will return a SubA with the built arithmetic expressions of both lists obtained (before and after the "-")
+        Nothing -> do -- If it doesn't find it
+            case findNotInner ["*"] (reverse list) of -- It will look for the last "*" that's not nested, which is second in least priority
+                Just reversedIndex -> do -- If it finds it
+                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "*" that's not nested, since it's reversed
+                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "*" that's not nested
+                    MultA (buildAexp before) (buildAexp (tail after)) -- It will return a MultA with the built arithmetic expressions of both lists obtained (before and after the "*")
+                Nothing -> buildAexp (tail (init list)) -- If it doesn't find it, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
+
+-- Builds a boolean expression from a list of tokens
+buildBexp :: [String] -> Bexp
+buildBexp [expr] = 
+    case expr of
+        "True" -> TrueB -- If it's "True" then it returns TrueB
+        "False" -> FalseB -- If it's "False" then it returns FalseB
+        _ -> error "Run-time error" -- If it's anything else, it will throw an error
+buildBexp list = 
+    case findNotInner ["and"] (reverse list) of -- It will look for the last "and" that's not nested (exact match to avoid finding vars with "and" in their name). It's done first because it has the least priority 
+        Just reversedIndex -> do -- If it finds it
+            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "and" that's not nested, since it's reversed
+            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "and" that's not nested
+            AndB (buildBexp before) (buildBexp (tail after)) -- It will return an AndB with the built boolean expressions of both lists obtained (before and after the "and")
+        Nothing -> do -- If it doesn't find it
+            case findNotInner ["="] (reverse list) of -- It will look for the last "=" that's not nested (exact match to avoid finding "==")
+                Just reversedIndex -> do -- If it finds it
+                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "=" that's not nested, since it's reversed
+                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "=" that's not nested
+                    BoolEqual (buildBexp before) (buildBexp (tail after)) -- It will return an BoolEqual with the built boolean expressions of both lists obtained (before and after the "=")
+                Nothing -> do -- If it doesn't find it
+                    case findNotInner ["not"] (reverse list) of -- It will look for the last "not" that's not nested (exact match to avoid finding vars with not in their name)
+                        Just reversedIndex -> do -- If it finds it 
+                            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "not" that's not nested, since it's reversed
+                            let after = drop index list -- It will get what comes after the "not"
+                            NegB (buildBexp (tail after)) -- It will return a NegB with the built boolean expression obtained (after the "not")
+                        Nothing -> do -- If it doesn't find it
+                            case findNotInner ["=="] (reverse list) of -- It will look for the last "==" that's not nested
+                                Just reversedIndex -> do -- If it finds it
+                                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "==" that's not nested, since it's reversed
+                                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "==" that's not nested
+                                    IntEqual (buildAexp before) (buildAexp (tail after)) -- It will return an BoolEqual with the built arithmetic expressions of both lists obtained (before and after the "==")
+                                Nothing -> do -- If it doesn't find it
+                                    case findNotInner ["<="] (reverse list) of -- It will look for the last "<=" that's not nested (this is done last since it is the boolean operator that has the highest priority)
+                                        Just reversedIndex -> do -- If it finds it
+                                            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "<=" that's not nested, since it's reversed
+                                            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "<=" that's not nested
+                                            LessEqual (buildAexp before) (buildAexp (tail after)) -- It will return a LessEqual with the built arithmetic expressions of both lists obtained (before and after the "<=")
+                                        Nothing -> buildBexp (tail (init list)) -- If it doesn't find it, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it)
 
 
+-- Receives a string (the program code written in the language) and returns the program
 parse :: String -> [Stm]
-parse str = parseTokens (lexer str) 
-
-parseTokens :: [Token] -> [Stm]
-parseTokens tokens =
-  case parseStm tokens of
-    Just (expr, []) -> [expr]
-    Just (expr, tokens) -> expr : parseTokens tokens
-    _ -> error "Parse error"
-
-
-parseIntOrParenExpr :: [Token] -> Maybe (Aexp, [Token])
-parseIntOrParenExpr (IntTok n : restTokens) = Just (Num n, restTokens)
-parseIntOrParenExpr (VarTok var : restTokens) = Just (Var var, restTokens)
-parseIntOrParenExpr (OpenTok : restTokens1) =
-  case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-    Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
-    Just _ -> Nothing -- no closing paren
-    Nothing -> Nothing
-parseIntOrParenExpr tokens = Nothing
-
-parseProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
-parseProdOrIntOrPar tokens = case parseIntOrParenExpr tokens of
-  Just (expr1, (TimesTok : restTokens1)) ->
-    case parseProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  result -> result
-
-parseSumOrSubOrProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
-parseSumOrSubOrProdOrIntOrPar tokens = case parseProdOrIntOrPar tokens of
-  Just (expr1, (PlusTok : restTokens1)) ->
-    case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  Just (expr1, (SubTok : restTokens1)) ->
-    case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  result -> result
-
--- Parsing Logic for Statements
-parseStm :: [Token] -> Maybe (Stm, [Token])
-parseStm (OpenTok : restTokens) =
-  case parseStm restTokens of
-    Just (expr, (CloseTok : restTokens1)) -> Just (expr, restTokens1)
-    Just _ -> Nothing -- no closing paren
-    Nothing -> Nothing
-parseStm (VarTok var : AssignTok : restTokens1) =
-  case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-    Just (expr, restTokens2) -> Just (Assign var expr, restTokens2)
-    Nothing -> Nothing
-parseStm (IfTok : restTokens1) =
-  case parseBoolean restTokens1 of
-    Just (bexp, ThenTok : restTokens2) -> 
-      case parseStm restTokens2 of
-        Just (stm1, ElseTok : restTokens3) ->
-          case parseStm restTokens3 of
-            Just (stm2, restTokens4) -> Just (If bexp stm1 stm2, restTokens4)
-            Nothing -> Nothing
-        Nothing -> Nothing
-    Nothing -> Nothing
-parseStm (WhileTok : restTokens1) =
-  case parseBoolean restTokens1 of
-    Just (bexp, DoTok : restTokens2) ->
-      case parseStm restTokens2 of
-        Just (stm, restTokens3) -> Just (While bexp stm, restTokens3)
-        Nothing -> Nothing
-    Nothing -> Nothing
-parseStm _ = Nothing
-
--- TODO por isto a lidar com parentesis
--- Parsing boolean expressions
-parseBoolean :: [Token] -> Maybe (Bexp, [Token])
-parseBoolean (BoolTok True : restTokens) = Just (TrueB, restTokens)
-parseBoolean (BoolTok False : restTokens) = Just (FalseB, restTokens)
-parseBoolean (NotTok : restTokens1) =
-  case parseBoolean restTokens1 of
-    Just (bexp, restTokens2) -> Just (Not bexp, restTokens2)
-    Nothing -> Nothing
-parseBoolean (OpenTok : restTokens) =
-  case parseBoolean restTokens of
-    Just (aexp1, (CloseTok : restTokens1)) -> Just (aexp1, restTokens1)
-    Just _ -> Nothing -- no closing paren
-    Nothing -> Nothing
-parseBoolean tokens = 
-  case parseSumOrSubOrProdOrIntOrPar tokens of
-    Just (aexp1, (LessEqualTok : restTokens1)) ->
-      case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-        Just (aexp2, restTokens2) -> Just (LessEqual aexp1 aexp2, restTokens2)
-        Nothing -> Nothing
-    Just (aexp1, (EqualIntTok : restTokens1)) ->
-      case parseSumOrSubOrProdOrIntOrPar restTokens1 of
-        Just (aexp2, restTokens2) -> Just (IntEqual aexp1 aexp2, restTokens2)
-        Nothing -> Nothing
-parseBoolean tokens = 
-  case parseBoolean tokens of 
-    Just (bexp1, (EqualBoolTok : restTokens1)) ->
-      case parseBoolean restTokens1 of
-        Just (bexp2, restTokens2) -> Just (BoolEqual bexp1 bexp2, restTokens2)
-        Nothing -> Nothing 
-    Just (bexp1, (AndTok : restTokens1)) ->
-      case parseBoolean restTokens1 of
-        Just (bexp2, restTokens2) -> Just (AndB bexp1 bexp2, restTokens2)
-        Nothing -> Nothing
-    Nothing -> Nothing
-
+parse = buildData . lexer
 
 -- To help you test your parser
 testParser :: String -> (String, String)
