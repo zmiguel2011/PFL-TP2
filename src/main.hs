@@ -175,6 +175,32 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 -- Part 2
 
+-- Data type for arithmetic expressions
+data Aexp
+  = Var String                  -- Variable
+  | Num Integer                 -- Numeric constant
+  | AddA Aexp Aexp              -- Addition
+  | SubA Aexp Aexp              -- Subtraction
+  | MultA Aexp Aexp             -- Multiplication
+  deriving (Show)
+
+-- Data type for boolean expressions
+data Bexp
+  = TrueB                       -- Boolean True
+  | FalseB                      -- Boolean False
+  | AndB Bexp Bexp              -- And operation
+  | IntEqual Aexp Aexp          -- Integer Equality comparison
+  | BoolEqual Bexp Bexp         -- Boolean Equality comparison
+  | LessEqual Aexp Aexp         -- Less than or equal comparison
+  | Not Bexp                    -- Negation
+  deriving (Show)
+
+-- Data type for statements
+data Stm
+  = Assign String Aexp          -- Assignment: var := Aexp
+  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
+  | While Bexp Stm              -- While loop: while Bexp do Stm
+  deriving (Show)
 
 -- COMPILER FUNCTIONS --
 
@@ -186,20 +212,26 @@ compA (AddA a1 a2)      = compA a2 ++ compA a1 ++ [Add]
 compA (SubA a1 a2)      = compA a2 ++ compA a1 ++ [Sub]
 compA (MultA a1 a2)     = compA a2 ++ compA a1 ++ [Mult]
 
+-- TODO add AND operation
 -- Compiler for boolean expressions (Bexp) into machine instructions (Code)
 compB :: Bexp -> Code
 compB TrueB             = [Tru]
 compB FalseB            = [Fals]
-compB (Equal a1 a2)     = compA a2 ++ compA a1 ++ [Equ]
+compB (IntEqual a1 a2)     = compA a2 ++ compA a1 ++ [Equ]
+compB (BoolEqual b1 b2)     = compB b2 ++ compB b1 ++ [Equ]
 compB (LessEqual a1 a2) = compA a2 ++ compA a1 ++ [Le]
 compB (Not b1)          = compB b1 ++ [Neg]
 
 -- Compiler for statements (Stm) into machine instructions (Code)
-compile :: Stm -> Code
-compile (Assign var aexp)   = compA aexp ++ [Store var]
-compile (Seq stm1 stm2)     = compile stm1 ++ compile stm2
-compile (If bexp stm1 stm2) = compB bexp ++ [Branch (compile stm1) (compile stm2)]
-compile (While bexp stm)    = [Loop (compB bexp) (compile stm)]
+compileStm :: Stm -> Code
+compileStm (Assign var aexp)   = compA aexp ++ [Store var]
+compileStm (If bexp stm1 stm2) = compB bexp ++ [Branch (compileStm stm1) (compileStm stm2)]
+compileStm (While bexp stm)    = [Loop (compB bexp) (compileStm stm)]
+
+-- Main compiler
+compile :: [Stm] -> Code
+compile [] = []
+compile (x:xs) = compileStm x ++ compile xs
 
 data Token
   = PlusTok
@@ -257,76 +289,29 @@ lexer str@(chr : _)
 lexer (_ : restString)
   = error ("unexpected character: '" ++ "'")
 
--- Data type for arithmetic expressions
-data Aexp
-  = Var String                  -- Variable
-  | Num Integer                 -- Numeric constant
-  | AddA Aexp Aexp              -- Addition
-  | SubA Aexp Aexp              -- Subtraction
-  | MultA Aexp Aexp             -- Multiplication
-  deriving (Show)
 
--- Data type for boolean expressions
-data Bexp
-  = TrueB                       -- Boolean True
-  | FalseB                      -- Boolean False
-  | Equal Aexp Aexp             -- Equality comparison
-  | LessEqual Aexp Aexp         -- Less than or equal comparison
-  | Not Bexp                    -- Negation
-  deriving (Show)
+parse :: String -> [Stm]
+parse str = parseTokens (lexer str) 
 
--- Data type for statements
-data Stm
-  = Assign String Aexp          -- Assignment: var := Aexp
-  | Seq Stm Stm                 -- Sequence of statements: Stm1 ; Stm2
-  | If Bexp Stm Stm             -- If-then-else statement: if Bexp then Stm1 else Stm2
-  | While Bexp Stm              -- While loop: while Bexp do Stm
-  deriving (Show)
-
-
--- parse :: String -> [Stm]
-parse :: [Token] -> [Stm]
-parse tokens =
+parseTokens :: [Token] -> [Stm]
+parseTokens tokens =
   case parseStm tokens of
-    Just (expr, []) -> expr
+    Just (expr, []) -> [expr]
+    Just (expr, tokens) -> expr : parseTokens tokens
     _ -> error "Parse error"
 
-parseIntOrVar :: [Token] -> Maybe ([Stm], [Token])
-parseIntOrVar (IntTok n : restTokens) = Just (Num n, restTokens)
-parseIntOrVar (VarTok n : restTokens) = Just (VarX n, restTokens)
-parseIntOrVar tokens = Nothing
 
-parseProdOrInt :: [Token] -> Maybe ([Stm], [Token])
-parseProdOrInt tokens = case parseIntOrVar tokens of
-  Just (expr1, (TimesTok : restTokens1)) ->
-    case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  result -> result
-
-parseSumOrProdOrInt :: [Token] -> Maybe ([Stm], [Token])
-parseSumOrProdOrInt tokens = case parseProdOrInt tokens of
-  Just (expr1, (PlusTok : restTokens1)) ->
-    case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (AddX expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  Just (expr1, SubTok : restTokens1) ->
-    case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (SubX expr1 expr2, restTokens2)
-      Nothing -> Nothing
-  result -> result
-
-parseIntOrParenExpr :: [Token] -> Maybe ([Stm], [Token])
+parseIntOrParenExpr :: [Token] -> Maybe (Aexp, [Token])
 parseIntOrParenExpr (IntTok n : restTokens) = Just (Num n, restTokens)
-parseIntOrParenExpr (VarTok n : restTokens) = Just (VarX n, restTokens)
+parseIntOrParenExpr (VarTok var : restTokens) = Just (Var var, restTokens)
 parseIntOrParenExpr (OpenTok : restTokens1) =
-  case parseSumOrProdOrIntOrPar restTokens1 of
+  case parseSumOrSubOrProdOrIntOrPar restTokens1 of
     Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
     Just _ -> Nothing -- no closing paren
     Nothing -> Nothing
 parseIntOrParenExpr tokens = Nothing
 
-parseProdOrIntOrPar :: [Token] -> Maybe ([Stm], [Token])
+parseProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
 parseProdOrIntOrPar tokens = case parseIntOrParenExpr tokens of
   Just (expr1, (TimesTok : restTokens1)) ->
     case parseProdOrIntOrPar restTokens1 of
@@ -334,29 +319,80 @@ parseProdOrIntOrPar tokens = case parseIntOrParenExpr tokens of
       Nothing -> Nothing
   result -> result
 
-parseSumOrProdOrIntOrPar :: [Token] -> Maybe ([Stm], [Token])
-parseSumOrProdOrIntOrPar tokens = case parseProdOrIntOrPar tokens of
+parseSumOrSubOrProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
+parseSumOrSubOrProdOrIntOrPar tokens = case parseProdOrIntOrPar tokens of
   Just (expr1, (PlusTok : restTokens1)) ->
-    case parseSumOrProdOrIntOrPar restTokens1 of
+    case parseSumOrSubOrProdOrIntOrPar restTokens1 of
       Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
+      Nothing -> Nothing
+  Just (expr1, (SubTok : restTokens1)) ->
+    case parseSumOrSubOrProdOrIntOrPar restTokens1 of
+      Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
       Nothing -> Nothing
   result -> result
 
 -- Parsing Logic for Statements
-parseStm :: [Token] -> Maybe ([Stm], [Token])
+parseStm :: [Token] -> Maybe (Stm, [Token])
 parseStm (VarTok var : AssignTok : restTokens1) =
-  case parseSumOrProdOrIntOrPar restTokens1 of
+  case parseSumOrSubOrProdOrIntOrPar restTokens1 of
     Just (expr, restTokens2) -> Just (Assign var expr, restTokens2)
+    Nothing -> Nothing
+parseStm (IfTok : restTokens1) =
+  case parseBoolean restTokens1 of
+    Just (bexp, ThenTok : restTokens2) -> 
+      case parseStm restTokens2 of
+        Just (stm1, ElseTok : restTokens3) ->
+          case parseStm restTokens3 of
+            Just (stm2, restTokens4) -> Just (If bexp stm1 stm2, restTokens4)
+            Nothing -> Nothing
+        Nothing -> Nothing
+    Nothing -> Nothing
+parseStm (WhileTok : restTokens1) =
+  case parseBoolean restTokens1 of
+    Just (bexp, DoTok : restTokens2) ->
+      case parseStm restTokens2 of
+        Just (stm, restTokens3) -> Just (While bexp stm, restTokens3)
+        Nothing -> Nothing
+    Nothing -> Nothing
+parseStm _ = Nothing
+
+-- TODO por isto a lidar com parentesis
+-- Parsing boolean expressions
+parseBoolean :: [Token] -> Maybe (Bexp, [Token])
+parseBoolean (BoolTok True : restTokens) = Just (TrueB, restTokens)
+parseBoolean (BoolTok False : restTokens) = Just (FalseB, restTokens)
+parseBoolean (NotTok : restTokens) =
+  case parseBoolean restTokens of
+    Just (bexp, restTokens1) -> Just (Not bexp, restTokens1)
+    Nothing -> Nothing
+parseBoolean tokens = 
+  case parseSumOrSubOrProdOrIntOrPar tokens of
+    Just (aexp1, (LessEqualTok : restTokens1)) ->
+      case parseSumOrSubOrProdOrIntOrPar restTokens1 of
+        Just (aexp2, restTokens2) -> Just (LessEqual aexp1 aexp2, restTokens2)
+        Nothing -> Nothing
+    Just (aexp1, (EqualIntTok : restTokens1)) ->
+      case parseSumOrSubOrProdOrIntOrPar restTokens1 of
+        Just (aexp2, restTokens2) -> Just (IntEqual aexp1 aexp2, restTokens2)
+        Nothing -> Nothing
+parseBoolean tokens = 
+  case parseBoolean tokens of 
+    Just (bexp1, (EqualBoolTok : restTokens1)) ->
+      case parseBoolean restTokens1 of
+        Just (bexp2, restTokens2) -> Just (BoolEqual bexp1 bexp2, restTokens2)
+        Nothing -> Nothing 
+    Just (bexp1, (AndTok : restTokens1)) ->
+      case parseBoolean restTokens1 of
+        Just (bexp2, restTokens2) -> Just (AndB bexp1 bexp2, restTokens2)
+        Nothing -> Nothing
     Nothing -> Nothing
 
 
-
-{-
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
--}
+
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
