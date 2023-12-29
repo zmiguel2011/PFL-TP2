@@ -1,7 +1,6 @@
-import Data.List (sortBy, intercalate, isSuffixOf, elemIndex, isPrefixOf)
+import Data.List (sortBy, intercalate, isPrefixOf)
 import Text.Read (read)
 import Data.Char (isDigit, isSpace, chr, isLetter)
-import Data.Text.Internal.Read (digitToInt)
 
 -- Part 1
 
@@ -229,45 +228,45 @@ compB (NegB b1)         = compB b1 ++ [Neg]
 compile :: [Stm] -> Code
 compile [] = []
 compile (stm:rest) = case stm of
-  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest
-  If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest
-  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest
-  Aexp aexp -> compA aexp ++ compile rest
-  Bexp bexp -> compB bexp ++ compile rest
+  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest -- It will compile the arithmetic expression and store the result in the variable
+  If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest -- It will compile the boolean expression and branch to the statements of "then" or "else" depending on the result
+  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest -- It will compile the boolean expression and the statements of "do" and then loop them
+  Aexp aexp -> compA aexp ++ compile rest -- It will compile the arithmetic expression
+  Bexp bexp -> compB bexp ++ compile rest -- It will compile the boolean expression
 
--- Auxiliary function for parse. Receives a string and splits it into a list of tokens (as a list of strings)
+-- Auxiliary function for parsing. Receives a string and splits it into a list of tokens (strings)
 lexer :: String -> [String]
 lexer [] = []
 lexer str
-    | isPrefixOf "<=" str = "<=" : lexer (drop 2 str) -- If the string starts with "<=", it will add it to the list of tokens and call lexer again with the rest of the string
-    | isPrefixOf "==" str = "==" : lexer (drop 2 str) -- If the string starts with "==", it will add it to the list of tokens and call lexer again with the rest of the string
-    | isPrefixOf ":=" str = ":=" : lexer (drop 2 str) -- If the string starts with ":=", it will add it to the list of tokens and call lexer again with the rest of the string
-    | otherwise = 
-    case head str of
-        ' ' -> lexer (tail str) -- We ignore spaces and call lexer again with the rest of the string
-        '(' -> "(" : lexer (tail str) -- If the string starts with "(", it will add it to the list of tokens and call lexer again with the rest of the string
-        ')' -> ")" : lexer (tail str) -- If the string starts with ")", it will add it to the list of tokens and call lexer again with the rest of the string
-        ';' -> ";" : lexer (tail str) -- If the string starts with ";", it will add it to the list of tokens and call lexer again with the rest of the string
-        '=' -> "=" : lexer (tail str) -- If the string starts with "=", it will add it to the list of tokens and call lexer again with the rest of the string
-        '+' -> "+" : lexer (tail str) -- If the string starts with "+", it will add it to the list of tokens and call lexer again with the rest of the string
-        '-' -> "-" : lexer (tail str) -- If the string starts with "-", it will add it to the list of tokens and call lexer again with the rest of the string
-        '*' -> "*" : lexer (tail str) -- If the string starts with "*", it will add it to the list of tokens and call lexer again with the rest of the string
-        _ -> (head str :
-            takeWhile (\x -> x /= ' ' && x /= '(' && x /= ')' && x /= ';' && x /= '=' && x /= '+' && x /= '-' && x /= '*' && x /= '<' && x /= ':') (tail str)) : -- While x is different of any of these, it will save them in it's own space
-            lexer (dropWhile (\x -> x /= ' ' && x /= '(' && x /= ')' && x /= ';' && x /= '=' && x /= '+' && x /= '-' && x /= '*' && x /= '<' && x /= ':') (tail str)) -- Skips over the rest of the characters of the string that aren't these, so it doesnt parse something like ["12", "2"]
-
--- Receives a list of tokens (as a list of strings) and returns the built data program (as a list of statements)
+    | isPrefixOf "<=" str = "<=" : lexer (drop 2 str)
+    | isPrefixOf "==" str = "==" : lexer (drop 2 str)
+    | isPrefixOf ":=" str = ":=" : lexer (drop 2 str)
+    | otherwise = case head str of
+        ' ' -> lexer (tail str)
+        '(' -> "(" : lexer (tail str)
+        ')' -> ")" : lexer (tail str)
+        ';' -> ";" : lexer (tail str)
+        '=' -> "=" : lexer (tail str)
+        '+' -> "+" : lexer (tail str)
+        '-' -> "-" : lexer (tail str)
+        '*' -> "*" : lexer (tail str)
+        _   -> (head str : takeWhile condition (tail str)) : lexer (dropWhile condition (tail str))
+  where
+    condition x = notElem x " ()=;+-*"
+              
+-- Receives a list of tokens and returns the built data program (as a list of statements)
 buildData :: [String] -> [Stm]
 buildData [] = []
-buildData list = do
-    case findNotInner [";"] list of -- It will look for the first ";" that's not nested or that belongs to an if statement
-        Just index -> do -- If it finds it
-            let (stm, rest) = splitAt index list -- It will split the list in two, before and after the first ";" that's not nested
-            if head stm == "(" then buildData (tail (init stm)) -- If it's actually multiple nested statements instead of just one
-            else case rest of
-                [_] -> [buildStm stm] -- If it's at the last statement
-                _ -> buildStm stm : buildData (tail rest) -- If it's not at the last statement, it will build the statement and call itself again with the rest of the list
-        Nothing -> buildData (tail (init list)) -- If it doesn't find it, it will remove the first and last element of the list (the parentheses) and call itself again (This is only reached when it receives multiple statements that are altogether in between parentheses)
+buildData list =
+  case findFirstNotNested [";"] list of -- It will look for the first ";" that's not nested
+    Just index -> -- If it finds it
+      let (stm, rest) = splitAt index list -- It will split the list in two, stm has the statement and rest has the rest of the tokens
+      in if head stm == "(" -- If it's actually multiple nested statements instead of just one
+           then buildData (tail (init stm))
+           else case rest of
+                  [_] -> [buildStm stm] -- If it's the last statement, it will return a list with the built statement obtained
+                  _ -> buildStm stm : buildData (tail rest) -- If it's not the last statement, it will return a list with the built statement obtained and the rest of the statements obtained
+    Nothing -> buildData (tail (init list)) -- If it doesn't find it, then any statement left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
 
 -- Builds a statement from a list of tokens that were already separated by buildData
 buildStm :: [String] -> Stm
@@ -275,7 +274,7 @@ buildStm list =
     case head list of
         "if" -> do -- If it finds an "if"
             let (bexp, rest) = break (== "then") list -- It will split the list in two, before and after the "then", since before it has a boolean expression and after it has the statements
-            case findNotInner ["else"] (tail rest) of -- It will look for the first "else" that's not nested
+            case findFirstNotNested ["else"] (tail rest) of -- It will look for the first "else" that's not nested
                 Just index -> do -- If it finds it
                     let (stm1, stm2) = splitAt index (tail rest) -- It will split the list (rest) in two, stm1 has the statements that belong to the "then" and stm2 has the statements after the "else"
                     case head (tail stm2) of -- It will check if the first element of the statements of "else" is a "(" or not. In other words, if the "else" has multiple statements or not, if it does, they're handled by buildData, if not, buildStm can handle it. In any case, the statement of "then" are handled by buildData for ";" handling
@@ -290,84 +289,69 @@ buildStm list =
             let (var, aexp) = break (== ":=") list -- It will split the list in two, before and after the ":=", since before it has a variable and after it has an arithmetic expression
             Assign (head var) (buildAexp (tail aexp)) -- It will return an Assign with the variable and the built arithmetic expression obtained
 
--- Finds the first ocurrence in a list of tokens (as a list of strings), of any token inside a given list of tokens (e.g. ["+","-"]), that's not nested and returns it's index. A token is considered nested if it's between parentheses or inside an if statement
-findNotInner :: [String] -> [String] -> Maybe Int
-findNotInner targets = find 0 0 -- It will call the find function with depth 0, index 0 and the list of tokens
+-- Auxiliary function to find the first token that's not nested in a list of tokens
+findFirstNotNested :: [String] -> [String] -> Maybe Int
+findFirstNotNested targets = find 0 0 -- It will call the find function with depth 0, index 0 and the list of tokens
   where
-    find _ _ [] = Nothing -- If it reaches the end of the list or given an empty list, it will return Nothing
-    find depth index (x:rest) =
-        case x of
-        "(" -> find (depth + 1) (index + 1) rest -- If it finds a "(" it will increase the depth (as it's entering something nested) and the index
-        "then" -> find (depth + 1) (index + 1) rest -- If it finds a "then" it will increase the depth and the index (since it's inside the if statement)
-        ")" -> find (depth - 1) (index + 1) rest -- If it finds a ")" it will decrease the depth (as it's leaving something that it's nested) and the index
-        "else" | depth /= 0 -> find (depth - 1) (index + 1) rest -- If it finds a "else" it will decrease the depth (as it's the end of the if) and increase the index
-        _ -> do
-            if depth == 0 && (x `elem` targets) -- If it's not nested and it finds what it's looking for
-                then Just index -- It will return the index
-                else find depth (index + 1) rest -- If it's not what it's looking for, it will increase the index and keep looking
+    find _ _ [] = Nothing       -- If it reaches the end of the list or given an empty list, it will return Nothing
+    find depth index (x:rest)
+      | x == "(" || x == "then" = find (depth + 1) (index + 1) rest -- If it finds a "(" or a "then" it will increase the depth and the index
+      | x == ")" || (x == "else" && depth /= 0) = find (depth - 1) (index + 1) rest -- If it finds a ")" or an "else: it will decrease the depth and the index
+      | depth == 0 && x `elem` targets = Just index   -- If it's not nested and it finds what it's looking for, it will return the index
+      | otherwise = find depth (index + 1) rest       -- If it's not what it's looking for, it will increase the index and keep looking
 
 -- Builds an arithmetic expression from a list of tokens
 buildAexp :: [String] -> Aexp
-buildAexp [expr] = if all isDigit expr then Num (read expr) else Var expr -- If it's a number, it will return a Num, otherwise it will return a Var so it accepts both
-buildAexp list = 
-    case findNotInner ["+","-"] (reverse list) of -- It will look for the last "+" or "-" that's not nested. It's done first because it has the least priority
-        Just reversedIndex -> do -- If it finds it
-            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "+" or "-" that's not nested, since it's reversed
-            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "+" or "-" that's not nested
-            if list!!index == "+" -- If it's a "+"
-                then AddA (buildAexp before) (buildAexp (tail after)) -- It will return an AddA with the built arithmetic expressions of both lists obtained (before and after the "+")
-                else SubA (buildAexp before) (buildAexp (tail after)) -- If it's a "-", it will return a SubA with the built arithmetic expressions of both lists obtained (before and after the "-")
-        Nothing -> do -- If it doesn't find it
-            case findNotInner ["*"] (reverse list) of -- It will look for the last "*" that's not nested, which is second in least priority
-                Just reversedIndex -> do -- If it finds it
-                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "*" that's not nested, since it's reversed
-                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "*" that's not nested
-                    MultA (buildAexp before) (buildAexp (tail after)) -- It will return a MultA with the built arithmetic expressions of both lists obtained (before and after the "*")
-                Nothing -> buildAexp (tail (init list)) -- If it doesn't find it, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
+buildAexp [expr] -- If it's a single token
+  | all isDigit expr = Num (read expr) -- If it's a number, it will return a Num
+  | otherwise = Var expr -- If it's not a number, it will return a Var
+buildAexp list -- If it's multiple tokens
+  | Just reversedIndex <- findFirstNotNested ["+","-"] (reverse list) = do -- It will look for the last "+" or "-" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "+" or "-" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "+" or "-" that's not nested
+    if list!!index == "+" -- If it's a "+", it will return an AddA with the built arithmetic expressions of both lists obtained (before and after the "+")
+      then AddA (buildAexp before) (buildAexp (tail after)) -- It will return an AddA with the built arithmetic expressions of both lists obtained (before and after the "+")  
+      else SubA (buildAexp before) (buildAexp (tail after)) -- If it's a "-", it will return a SubA with the built arithmetic expressions of both lists obtained (before and after the "-")
+  | Just reversedIndex <- findFirstNotNested ["*"] (reverse list) = do -- It will look for the last "*" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "*" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "*" that's not nested
+    MultA (buildAexp before) (buildAexp (tail after)) -- It will return a MultA with the built arithmetic expressions of both lists obtained (before and after the "*")
+  | otherwise = buildAexp (tail (init list)) -- If it doesn't find any of the above, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
+
 
 -- Builds a boolean expression from a list of tokens
 buildBexp :: [String] -> Bexp
-buildBexp [expr] = 
-    case expr of
-        "True" -> TrueB -- If it's "True" then it returns TrueB
-        "False" -> FalseB -- If it's "False" then it returns FalseB
-        _ -> error "Run-time error" -- If it's anything else, it will throw an error
-buildBexp list = 
-    case findNotInner ["and"] (reverse list) of -- It will look for the last "and" that's not nested (exact match to avoid finding vars with "and" in their name). It's done first because it has the least priority 
-        Just reversedIndex -> do -- If it finds it
-            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "and" that's not nested, since it's reversed
-            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "and" that's not nested
-            AndB (buildBexp before) (buildBexp (tail after)) -- It will return an AndB with the built boolean expressions of both lists obtained (before and after the "and")
-        Nothing -> do -- If it doesn't find it
-            case findNotInner ["="] (reverse list) of -- It will look for the last "=" that's not nested (exact match to avoid finding "==")
-                Just reversedIndex -> do -- If it finds it
-                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "=" that's not nested, since it's reversed
-                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "=" that's not nested
-                    BoolEqual (buildBexp before) (buildBexp (tail after)) -- It will return an BoolEqual with the built boolean expressions of both lists obtained (before and after the "=")
-                Nothing -> do -- If it doesn't find it
-                    case findNotInner ["not"] (reverse list) of -- It will look for the last "not" that's not nested (exact match to avoid finding vars with not in their name)
-                        Just reversedIndex -> do -- If it finds it 
-                            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "not" that's not nested, since it's reversed
-                            let after = drop index list -- It will get what comes after the "not"
-                            NegB (buildBexp (tail after)) -- It will return a NegB with the built boolean expression obtained (after the "not")
-                        Nothing -> do -- If it doesn't find it
-                            case findNotInner ["=="] (reverse list) of -- It will look for the last "==" that's not nested
-                                Just reversedIndex -> do -- If it finds it
-                                    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "==" that's not nested, since it's reversed
-                                    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "==" that's not nested
-                                    IntEqual (buildAexp before) (buildAexp (tail after)) -- It will return an BoolEqual with the built arithmetic expressions of both lists obtained (before and after the "==")
-                                Nothing -> do -- If it doesn't find it
-                                    case findNotInner ["<="] (reverse list) of -- It will look for the last "<=" that's not nested (this is done last since it is the boolean operator that has the highest priority)
-                                        Just reversedIndex -> do -- If it finds it
-                                            let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "<=" that's not nested, since it's reversed
-                                            let (before, after) = splitAt index list -- It will split the list in two, before and after the last "<=" that's not nested
-                                            LessEqual (buildAexp before) (buildAexp (tail after)) -- It will return a LessEqual with the built arithmetic expressions of both lists obtained (before and after the "<=")
-                                        Nothing -> buildBexp (tail (init list)) -- If it doesn't find it, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it)
+buildBexp [expr]
+  | expr == "True" = TrueB -- If it's a "True", it will return a TrueB
+  | expr == "False" = FalseB -- If it's a "False", it will return a FalseB
+  | otherwise = error "Run-time error" -- If it's neither, it will return an error
+buildBexp list
+  | Just reversedIndex <- findFirstNotNested ["and"] (reverse list) = do -- It will look for the last "and" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "and" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "and" that's not nested
+    AndB (buildBexp before) (buildBexp (tail after)) -- It will return an AndB with the built boolean expressions of both lists obtained (before and after the "and")
+  | Just reversedIndex <- findFirstNotNested ["="] (reverse list) = do -- It will look for the last "=" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "=" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "=" that's not nested
+    BoolEqual (buildBexp before) (buildBexp (tail after)) -- It will return a BoolEqual with the built boolean expressions of both lists obtained (before and after the "=")
+  | Just reversedIndex <- findFirstNotNested ["not"] (reverse list) = do -- It will look for the last "not" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "not" that's not nested, since it's reversed
+    let after = drop index list -- It will split the list in two, before and after the last "not" that's not nested
+    NegB (buildBexp (tail after)) -- It will return a NegB with the built boolean expression of the list obtained (after the "not")
+  | Just reversedIndex <- findFirstNotNested ["=="] (reverse list) = do -- It will look for the last "==" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "==" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "==" that's not nested
+    IntEqual (buildAexp before) (buildAexp (tail after)) -- It will return an IntEqual with the built arithmetic expressions of both lists obtained (before and after the "==")
+  | Just reversedIndex <- findFirstNotNested ["<="] (reverse list) = do -- It will look for the last "<=" that's not nested
+    let index = length list - reversedIndex - 1 -- It will calculate the real index of the last "<=" that's not nested, since it's reversed
+    let (before, after) = splitAt index list -- It will split the list in two, before and after the last "<=" that's not nested
+    LessEqual (buildAexp before) (buildAexp (tail after)) -- It will return a LessEqual with the built arithmetic expressions of both lists obtained (before and after the "<=")
+  | otherwise = buildBexp (tail (init list)) -- If it doesn't find any of the above, then any expression left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
 
 
 -- Receives a string (the program code written in the language) and returns the program
 parse :: String -> [Stm]
-parse = buildData . lexer
+parse = buildData . lexer -- It will call lexer to split the string into tokens and then buildData to build the program
 
 -- To help you test your parser
 testParser :: String -> (String, String)
