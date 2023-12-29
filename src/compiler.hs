@@ -74,22 +74,25 @@ buildData list =
 
 -- Builds a statement from a list of tokens that were already separated by buildData
 buildStm :: [String] -> Stm
-buildStm list = 
-  case head list of
-    "if" -> do -- If it finds an "if"
-        let (bexp, rest) = break (== "then") list -- It will split the list in two, before and after the "then", since before it has a boolean expression and after it has the statements
-            (stm1, stm2) = break (== "else") (tail rest) -- It will split the list in two, before and after the "else", since before it has the statements of "then" and after it has the statements of "else"
-        case head (tail stm2) of -- It will check if the first element of the statements of "else" is a "(" or not. In other words, if the "else" has multiple statements or not, if it does, they're handled by buildData, if not, buildStm can handle it. In any case, the statement of "then" are handled by buildData for ";" handling
-            "(" -> If (buildBexp (tail bexp)) (buildData stm1) (buildData (tail stm2)) -- If it's a "(", it will return an If with the built bolean expression obtained, the built "then" statements (or statement) obtained and the "else" statements obtained (data)
-            _ -> If (buildBexp (tail bexp)) (buildData stm1) [buildStm (tail stm2)] -- If it's not a "(", it will return an If with the built bolean expression obtained, the built "then" statements (or statement) obtained and the "else" statement obtained (it can be anything, even another if statement)
-    "while" -> do -- If it finds a "while"
-        let (bexp, stm) = break (== "do") list -- It will split the list in two, before and after the "do", since before it has a boolean expression and after it has the statements
-        case head (tail stm) of -- It will check if the first element of the statements of "do" is a "(" or not. In other words, if the "do" has multiple statements or not, if it does, they're handled by buildData, if not, buildStm can handle it.
-            "(" -> While (buildBexp (tail bexp)) (buildData (tail stm)) -- If it's a "(", it will return a While with the built bolean expression obtained and the built "do" statements obtained (data)
-            _ -> While (buildBexp (tail bexp)) [buildStm (tail stm)] -- If it's not a "(", it will return a While with the built bolean expression obtained and the built "do" statement obtained (it can be anything, even another while statement)
-    _ -> do -- If it's not an "if" or a "while", it's an assignment
-        let (var, aexp) = break (== ":=") list -- It will split the list in two, before and after the ":=", since before it has a variable and after it has an arithmetic expression
-        Assign (head var) (buildAexp (tail aexp)) -- It will return an Assign with the variable and the built arithmetic expression obtained
+buildStm list
+  | head list == "if" = buildIfStm list
+  | head list == "while" = buildWhileStm list
+  | otherwise = buildAssignStm list
+  where
+    buildIfStm list
+      | head (tail elseStatements) == "(" = If (buildBexp (tail bexp)) (buildData thenStatements) (buildData (tail elseStatements))
+      | otherwise = If (buildBexp (tail bexp)) (buildData thenStatements) [buildStm (tail elseStatements)]
+      where
+        (bexp, rest) = break (== "then") list
+        (thenStatements, elseStatements) = break (== "else") (tail rest)
+    buildWhileStm list
+      | head (tail doStatements) == "(" = While (buildBexp (tail bexp)) (buildData (tail doStatements))
+      | otherwise = While (buildBexp (tail bexp)) [buildStm (tail doStatements)]
+      where
+        (bexp, doStatements) = break (== "do") list
+    buildAssignStm list = Assign (head var) (buildAexp (tail aexp))
+      where
+        (var, aexp) = break (== ":=") list
 
 
 -- Auxiliary function to find the first token that's not nested in a list of tokens
