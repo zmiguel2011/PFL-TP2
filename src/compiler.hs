@@ -26,7 +26,7 @@ compB (LessEqual a1 a2) = compA a2 ++ compA a1 ++ [Le]   -- a2 comes before a1 b
 compB (NegB b1)         = compB b1 ++ [Neg]
 
 -- Compiler for statements (Stm) into machine instructions (Code)
-compile :: [Stm] -> Code
+compile :: Program  -> Code
 compile [] = []
 compile (stm:rest) = case stm of
   Assign var aexp -> compA aexp ++ [Store var] ++ compile rest -- It will compile the arithmetic expression and store the result in the variable
@@ -58,7 +58,7 @@ lexer str
      
               
 -- Receives a list of tokens and returns the built data program (as a list of statements)
-buildData :: [String] -> [Stm]
+buildData :: [String] -> Program 
 buildData [] = []
 buildData list -- the pattern guard index <- findFirstNotNested [";"] ensures the first ";" that's not nested is found
   | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list, head stm == "(" = buildData (tail (init stm)) -- Split the list in two, before and after the ";", if it's actually multiple nested statements instead of just one
@@ -151,5 +151,5 @@ buildBexp list
 
 
 -- Receives a string (the program code written in the language) and returns the program
-parse :: String -> [Stm]
+parse :: String -> Program 
 parse = buildData . lexer -- It will call lexer to split the string into tokens and then buildData to build the program

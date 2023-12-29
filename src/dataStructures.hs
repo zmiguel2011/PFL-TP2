@@ -82,3 +82,5 @@ data Stm
   | Aexp Aexp                   -- Arithmetic expression
   | Bexp Bexp                   -- Boolean expression
   deriving Show
+
+type Program = [Stm]
