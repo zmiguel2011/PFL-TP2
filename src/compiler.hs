@@ -60,7 +60,7 @@ lexer str
 -- Receives a list of tokens and returns the built data program (as a list of statements)
 buildData :: [String] -> [Stm]
 buildData [] = []
-buildData list
+buildData list -- the pattern guard index <- findFirstNotNested [";"] ensures the first ";" that's not nested is found
   | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list, head stm == "(" = buildData (tail (init stm)) -- Split the list in two, before and after the ";", if it's actually multiple nested statements instead of just one
   | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list, [_] <- rest = [buildStm stm] -- Split the list in two, before and after the ";", if it's at the last statement 
   | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list = buildStm stm : buildData (tail rest) -- Split the list in two, before and after the ";", if it's at any other statement
