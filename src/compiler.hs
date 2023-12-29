@@ -60,17 +60,11 @@ lexer str
 -- Receives a list of tokens and returns the built data program (as a list of statements)
 buildData :: [String] -> [Stm]
 buildData [] = []
-buildData list =
-  case findFirstNotNested [";"] list of -- It will look for the first ";" that's not nested
-    Just index -> -- If it finds it
-      let (stm, rest) = splitAt index list -- It will split the list in two, stm has the statement and rest has the rest of the tokens
-      in if head stm == "(" -- If it's actually multiple nested statements instead of just one
-           then buildData (tail (init stm))
-           else case rest of
-                  [_] -> [buildStm stm] -- If it's the last statement, it will return a list with the built statement obtained
-                  _ -> buildStm stm : buildData (tail rest) -- If it's not the last statement, it will return a list with the built statement obtained and the rest of the statements obtained
-    Nothing -> buildData (tail (init list)) -- If it doesn't find it, then any statement left is between parentheses, so it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
-
+buildData list
+  | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list, head stm == "(" = buildData (tail (init stm)) -- Split the list in two, before and after the ";", if it's actually multiple nested statements instead of just one
+  | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list, [_] <- rest = [buildStm stm] -- Split the list in two, before and after the ";", if it's at the last statement 
+  | Just index <- findFirstNotNested [";"] list, let (stm, rest) = splitAt index list = buildStm stm : buildData (tail rest) -- Split the list in two, before and after the ";", if it's at any other statement
+  | otherwise = buildData (tail (init list)) -- If it doesn't find any ";", it will remove the first and last element of the list (the parentheses) and call itself again (this is done last since everything between parentheses has higher priority than what is outside of it).
 
 -- Builds a statement from a list of tokens that were already separated by buildData
 buildStm :: [String] -> Stm
@@ -79,18 +73,18 @@ buildStm list
   | head list == "while" = buildWhileStm list
   | otherwise = buildAssignStm list
   where
-    buildIfStm list
+    buildIfStm list -- Split the list in three, before and after the "then" and "else"
       | head (tail elseStatements) == "(" = If (buildBexp (tail bexp)) (buildData thenStatements) (buildData (tail elseStatements))
       | otherwise = If (buildBexp (tail bexp)) (buildData thenStatements) [buildStm (tail elseStatements)]
       where
         (bexp, rest) = break (== "then") list
         (thenStatements, elseStatements) = break (== "else") (tail rest)
-    buildWhileStm list
+    buildWhileStm list -- Split the list in two, before and after the "do"
       | head (tail doStatements) == "(" = While (buildBexp (tail bexp)) (buildData (tail doStatements))
       | otherwise = While (buildBexp (tail bexp)) [buildStm (tail doStatements)]
       where
         (bexp, doStatements) = break (== "do") list
-    buildAssignStm list = Assign (head var) (buildAexp (tail aexp))
+    buildAssignStm list = Assign (head var) (buildAexp (tail aexp)) -- Split the list in two, before and after the ":="
       where
         (var, aexp) = break (== ":=") list
 
