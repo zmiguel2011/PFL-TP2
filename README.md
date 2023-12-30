@@ -1,9 +1,9 @@
-# Assembler and Transpiler (source-to-source compiler)
+# Transpiler (source-to-source compiler)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Uporto FEUP](https://img.shields.io/badge/UPorto-FEUP-brown)](https://fe.up.pt)
 
-`A low-level machine and transpiler written in Haskell.`
+`A source-to-source compiler and low-level assembler written in Haskell.`
 
 ## Index 
 
@@ -39,7 +39,7 @@
 
 ## Identification of the topic and group
 
-- **Short description:** A source-to-source compiler and assembler written in Haskell.
+- **Short description:** A source-to-source compiler and low-level assembler written in Haskell.
 - **Group:** T08_G01
 - **Group members:** 
     - [José Miguel Moreira Isidro](https://github.com/zmiguel2011) (<up202006485@fe.up.pt>)
@@ -344,9 +344,9 @@ It achieves this by first using the `lexer` function to tokenize the input strin
 
 ## Conclusions
 
-In conclusion, this project provided a valuable opportunity to delve deeper into Haskell programming and its application in building a lexer and parser. The process of tokenizing an input string and building an Abstract Syntax Tree (AST) from it was both challenging and rewarding, and it offered practical insights into how programming languages are processed.
+In conclusion, this project provided a valuable opportunity to delve deeper into Haskell programming and its application in building an assembler, compiler and parser. The process of tokenizing an input string and building an Abstract Syntax Tree (AST) from it was both challenging and rewarding, and it offered practical insights into how programming languages are processed.
 
-The project deadlines were reasonable, allowing for a thorough exploration of the problem space without undue pressure. The practical lessons were instrumental in guiding the project's direction and in clarifying complex concepts.
+The project deadlines were reasonable, allowing for a thorough exploration of the problem space without undue pressure. The project guide initially seemed unclear, however, we successfully navigated through this complexity.
 
 The group worked effectively together, successfully implementing the proposed features and producing well-documented and organized code. This project not only enhanced our Haskell programming skills but also deepened our understanding of the language's unique features and quirks.
 
