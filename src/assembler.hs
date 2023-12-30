@@ -54,12 +54,16 @@ updateVar :: Variable -> Value -> [(Variable, Value)] -> [(Variable, Value)]
 updateVar key val = ((key, val) :) . removeVar key
 
 -- Auxiliary function for the fetch-x operation
+-- If the variable is in the state, it pushes the value onto the stack
+-- Otherwise, it throws an error
 fetchVar :: Variable -> Stack -> State -> (Stack, State)
 fetchVar var stack state
   | Just value <- lookup var state = (push value stack, state)
   | otherwise                      = error "Run-time error"
 
 -- Auxiliary function for the store-x operation
+-- If the variable is already in the state, it updates the value
+-- Otherwise, it adds the variable to the state
 storeVar :: Variable -> Stack -> State -> (Stack, State)
 storeVar var stack state
   | isEmpty stack = error "Run-time error"

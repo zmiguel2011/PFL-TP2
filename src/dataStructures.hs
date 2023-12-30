@@ -82,4 +82,5 @@ data Stm
   | While Bexp [Stm]            -- While loop: while Bexp do Stm
   deriving Show
 
+-- Data type for the program
 type Program = [Stm]
