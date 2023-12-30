@@ -1,4 +1,4 @@
-# Low-level Machine and Transpiler
+# Assembler and Transpiler (source-to-source compiler)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Uporto FEUP](https://img.shields.io/badge/UPorto-FEUP-brown)](https://fe.up.pt)
@@ -11,7 +11,7 @@
 - [Installation and Execution](#installation-and-execution)
   - [Installation](#installation)
   - [Execution](#execution)
-- [Machine logic (First Part)](#machine-logic-first-part)
+- [Assembler (First Part)](#assembler-first-part)
   - [Data Types](#data-types)
     - [Variable and Value](#variable-and-value)
     - [Stack](#stack)
@@ -31,7 +31,7 @@
 
 ## Identification of the topic and group
 
-- **Short description:** A low-level machine, source-to-source compiler written in Haskell.
+- **Short description:** A source-to-source compiler and assembler written in Haskell.
 - **Group:** T08_G01
 - **Group members:** 
     - [José Miguel Moreira Isidro](https://github.com/zmiguel2011) (<up202006485@fe.up.pt>)
@@ -53,11 +53,12 @@ To run this game you need a running Haskell environment, preferably [GHCi](https
 
 1. Open `ghci`, GHC's interactive environment;
 2. Load `main.hs`, located in the `src` folder;
-3. Call the `testAssembler` with a list of code instructions to run them. There are a few examples in  `main.hs`.
-4. Call the `testParser` with a the code string to parse and run. There are a few examples in  `main.hs`.
+3. Call the `testAssembler` with a list of code instructions to run them. There are a few examples in  `tests.hs`.
+4. Call the `testParser` with a the code string to parse and run. There are a few examples in  `tests.hs`.
+5. To run all the predefined tests, call the `main` function with no arguments.
 
 
-## Machine logic (First Part)
+## Assembler (First Part)
 
 The first part of the project was a sucess, with the `run` function succeeding in all given tests.
 
@@ -152,7 +153,7 @@ The `run` function iteratively processes machine instructions until the code is 
 
 The function handles errors such as attempts to perform operations on an empty stack or unexpected operand types, raising run-time errors when necessary. The `run` function returns the final state of the stack, allowing users to inspect the resulting values after executing a sequence of machine instructions.
 
-Furthermore, we improved on the previous implementation of the `calc` (from TP classes), so it handles most of the operations performed by the machine. As previously mentioned, the `Value` data improves the code making it very concise and readable. 
+Furthermore, we improved on the previous implementation of the `calc` (from TP classes), so it handles most of the operations performed by the machine. The code for these functions is available in `assembler.hs`.
 
 ## Compiler and Parser (Second Part)
 
