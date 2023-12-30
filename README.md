@@ -35,6 +35,7 @@
       - [findFirstNotNested](#findfirstnotnested)
       - [parse](#parse)
 - [Conclusions](#conclusions)
+- [Bibliography](#bibliography)
 
 
 ## Identification of the topic and group
