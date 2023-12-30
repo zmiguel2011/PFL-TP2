@@ -26,6 +26,13 @@
       - [Statements](#statements)
   - [Compiler](#compiler)
   - [Parser](#parser)
+    - [Lexer](#lexer)
+    - [Parsing](#parsing)
+      - [buildData](#builddata)
+      - [buildStm](#buildstm)
+      - [buildAexp & buildBexp](#buildaexp--buildbexp)
+      - [findFirstNotNested](#findfirstnotnested)
+      - [parse](#parse)
 - [Conclusions](#conclusions)
 
 
@@ -131,7 +138,7 @@ In addition to the above, we have also implemented some auxiliary functions to c
 
 #### State Functions
 
-The **State** functions also straightforward, however a little more complex. After convertin the state to a string, it represents the state as an list of pairs variable-value, separated by commas and without spaces, with the pairs ordered in alphabetical order of the variable name. Each variable-value pair is represented without spaces and using an ”=”.
+The **State** functions also straightforward, however a little more complex. After converting the state to a string, it represents the state as an list of pairs variable-value, separated by commas and without spaces, with the pairs ordered in alphabetical order of the variable name. Each variable-value pair is represented without spaces and using an ”=”.
 
 ```haskell
 -- Auxiliary function to create an empty stack
@@ -159,19 +166,172 @@ Furthermore, we improved on the previous implementation of the `calc` (from TP c
 
 ### Data Types
 
+These data structures form the foundation for representing arithmetic expressions, boolean expressions, and statements in a compiler. They are used as translation tools between the tokenized input string and the machine code.
+
 #### Arithmetic Expressions
 
+```haskell
+-- Data type for arithmetic expressions
+data Aexp
+  = Var String                  -- Variable
+  | Num Integer                 -- Numeric constant
+  | AddA Aexp Aexp              -- Addition
+  | SubA Aexp Aexp              -- Subtraction
+  | MultA Aexp Aexp             -- Multiplication
+  deriving Show
+```
 
 #### Boolean Expressions
 
+```haskell
+-- Data type for boolean expressions
+data Bexp
+  = TrueB                       
+  | FalseB                     
+  | AndB Bexp Bexp              -- And operation
+  | IntEqual Aexp Aexp          -- Integer Equality comparison
+  | BoolEqual Bexp Bexp         -- Boolean Equality comparison
+  | LessEqual Aexp Aexp         -- Less than or equal comparison
+  | NegB Bexp                   -- Negation
+  deriving Show
+```
 
 #### Statements
 
+-- Data type for statements
+data Stm
+  = Assign String Aexp          -- var := Aexp
+  | If Bexp [Stm] [Stm]         -- if Bexp then Stm1 else Stm2
+  | While Bexp [Stm]            -- while Bexp do Stm
+  | NoopStm                     -- No operation
+  | Aexp Aexp                   -- Arithmetic expression
+  | Bexp Bexp                   -- Boolean expression
+  deriving Show
 
 ### Compiler
 
+The main compiler function `compile :: [Stm] -> Code` compiples a list of statements (`Stm`) into machine code (`Code`). It relies on pattern matching to handle the various types of statements, including assignments, if-then-else statements, while loops, and standalone arithmetic or boolean expressions. This function depends on the auxiliar functions `compA :: Aexp -> Code` and `compB :: Bexp -> Code`, that with similar behaviour, are responsible for arithmetic and boolean expressions respectively.
+
+```haskell
+-- Compiler for statements (Stm) into machine instructions (Code)
+compile :: [Stm] -> Code
+compile [] = []
+compile (stm:rest) = case stm of
+  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest 
+  If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest 
+  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest 
+  Aexp aexp -> compA aexp ++ compile rest 
+  Bexp bexp -> compB bexp ++ compile rest 
+```
+
+In the code above the function deconstructs a matching statement into the appropriate stack ordered machine code. Furthermore, it recursively calls on itself when a statement is comprised of other statements, and calls the boolean and arithmetic compiler when needed.
 
 ### Parser
 
+#### Lexer 
+
+The `lexer :: String -> [String]` function is an auxiliary component for parsing, it processes a given string and breaks it into a list of tokens (strings).
+
+```haskell
+-- Auxiliary function for parsing. Receives a string and splits it into a list of tokens (strings)
+lexer :: String -> [String]
+lexer [] = []
+lexer str
+    | "<=" `isPrefixOf` str = "<=" : lexer (drop 2 str) 
+    | "==" `isPrefixOf` str = "==" : lexer (drop 2 str) 
+    | ":=" `isPrefixOf` str = ":=" : lexer (drop 2 str) 
+    | otherwise = case head str of
+        ' ' -> lexer (tail str) -- ignore spaces
+        '(' -> "(" : lexer (tail str) 
+        ')' -> ")" : lexer (tail str) 
+        ';' -> ";" : lexer (tail str) 
+        '=' -> "=" : lexer (tail str) 
+        '+' -> "+" : lexer (tail str) 
+        '-' -> "-" : lexer (tail str)
+        '*' -> "*" : lexer (tail str) 
+        ':' -> ":" : "=" : lexer (tail str) 
+        _   -> (head str : takeWhile condition (tail str)) : lexer (dropWhile condition (tail str)) 
+  where
+    condition x = x `notElem` " ()=;=+-*<:"
+```
+
+#### Parsing
+
+The parsing is done through a series of functions that build the abstract syntax tree (AST) of the program. 
+
+##### buildData
+
+The buildData function takes a list of tokens and constructs a list of statements (`[Stm]`). It uses the `findFirstNotNested` function to find the first semicolon (`;`) that is not nested within parentheses. 
+
+It then splits the list into two parts before and after the semicolon, after this it calls the `buildStm` function on the initial statement and recursively calls itself on the rest of the tokens.
+
+##### buildStm
+
+The buildStm function takes a list of tokens representing a statement and constructs the corresponding statement (`Stm`). Depending on the first token, it calls different functions (`buildIfStm`, `buildWhileStm`, `buildAssignStm`) to construct the specific type of statement.
+
+```haskell
+-- Builds a statement from a list of tokens that were already separated by buildData
+buildStm :: [String] -> Stm
+buildStm list
+  | head list == "if" = buildIfStm list
+  | head list == "while" = buildWhileStm list
+  | otherwise = buildAssignStm list
+  where
+    buildIfStm list 
+      | head (tail elseStatements) == "(" = If (buildBexp (tail bexp)) (buildData thenStatements) (buildData (tail elseStatements))
+      | otherwise = If (buildBexp (tail bexp)) (buildData thenStatements) [buildStm (tail elseStatements)]
+      where
+        (bexp, rest) = break (== "then") list
+        (thenStatements, elseStatements) = break (== "else") (tail rest)
+    buildWhileStm list 
+      | head (tail doStatements) == "(" = While (buildBexp (tail bexp)) (buildData (tail doStatements))
+      | otherwise = While (buildBexp (tail bexp)) [buildStm (tail doStatements)]
+      where
+        (bexp, doStatements) = break (== "do") list
+    buildAssignStm list = Assign (head var) (buildAexp (tail aexp)) 
+      where
+        (var, aexp) = break (== ":=") list
+
+```
+
+Taking advantage of the nested `where` cases, we can differentiate the functionality of the function accordingly to the first character of the token list (`[String]`). Then it divides the token list accordingly (in 3 or 2 parts) and further builds the statement (`Stm`) using other build functions.
+
+##### buildAexp & buildBexp
+
+These functions take a list of tokens and construct arithmetic expressions (`Aexp`) and boolean expressions (`Bexp`), respectively. 
+
+They use the `findFirstNotNested` function to find the last operator that is not nested within parentheses. Based on the operator found, they construct the corresponding expression. If no operator is found, it assumes the expression is wrapped in parentheses and calls itself recursively on the expression without the parentheses.
+
+##### findFirstNotNested
+
+An essential function to the functionality of the above functions is the `findFirstNotNested :: [String] -> [String] -> Maybe Int` which is designed to find the index of the first token in a list of tokens that is not nested within parentheses or other specific constructs. 
+
+```haskell
+-- Auxiliary function to find the first token that's not nested in a list of tokens
+findFirstNotNested :: [String] -> [String] -> Maybe Int
+findFirstNotNested targets = find 0 0 
+  where
+    find _ _ [] = Nothing      
+    find depth index (x:rest)
+      | x == "(" || x == "then" = find (depth + 1) (index + 1) rest
+      | x == ")" || (x == "else" && depth /= 0) = find (depth - 1) (index + 1) rest 
+      | depth == 0 && x `elem` targets = Just index
+      | otherwise = find depth (index + 1) rest    
+
+```
+
+The function makes use of a `depth` variable that acts as a counter to keep track of the level of nesting of the current traversal of input token, this value is increased when an opening parenthesis (`(`) or a `then` statement is encountered and decreased when a closing parentheses (`)`) or a `else` statement.
+
+With this approach, when the depth is equal to 0 and the current token being analyzed is the same as the target one, the index of this token is returned.
+
+##### parse
+
+The `parse :: String -> [Stm]` function takes a string representing the program code and returns the parsed program, which is a list of statements (`[Stm]`).
+
+It achieves this by first using the `lexer` function to tokenize the input string and then using the `buildData` function to build the AST of the program.
 
 ## Conclusions
+
+Overall the development of the program was enjoyable, the deadlines were achievable and the pratical lessons were very much helpful and ilustrative in regards to the project. We, as a group, feel we accomplished the features we proposed, and believe we were able to present well documented and organized code.
+
+Furthermore, it helped develop our Haskell skills and deepen our knowledge about its tricks and quirks.

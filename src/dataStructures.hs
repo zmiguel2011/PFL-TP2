@@ -19,8 +19,10 @@ data Value
   = MyInt Integer                   -- Integer value
   | MyBool Bool                     -- Boolean value
   deriving Show
+
 -- Data type for the machine stack
 type Stack = [Value]
+
 -- Data type for the machine state (storage)
 type State = [(Variable, Value)]    -- Variable name and value
 
@@ -64,8 +66,8 @@ data Aexp
 
 -- Data type for boolean expressions
 data Bexp
-  = TrueB                       -- Boolean True
-  | FalseB                      -- Boolean False
+  = TrueB                       
+  | FalseB                      
   | AndB Bexp Bexp              -- And operation
   | IntEqual Aexp Aexp          -- Integer Equality comparison
   | BoolEqual Bexp Bexp         -- Boolean Equality comparison
