@@ -24,10 +24,11 @@
       - [Arithmetic Expressions](#arithmetic-expressions)
       - [Boolean Expressions](#boolean-expressions)
       - [Statements](#statements)
+      - [Program](#program)
   - [Compiler](#compiler)
   - [Parser](#parser)
     - [Lexer](#lexer)
-    - [Parsing](#parsing)
+    - [Parsing Functions](#parsing-functions)
       - [buildData](#builddata)
       - [buildStm](#buildstm)
       - [buildAexp & buildBexp](#buildaexp--buildbexp)
@@ -112,11 +113,9 @@ type State = [(Variable, Value)]
 These **Stack** functions are very straightforward. After convertin the stack to a string, it represents the stack as an ordered list of values, separated by commas and without spaces, with the leftmost value representing the top of the stack.
 
 ```haskell
--- Auxiliary function to create an empty stack
 createEmptyStack :: Stack
 createEmptyStack = []
 
--- Auxiliary function to convert the stack to a string
 stack2Str :: Stack -> String
 stack2Str []     = ""
 stack2Str [x]    = showVal x
@@ -126,7 +125,6 @@ stack2Str (x:xs) = showVal x ++ "," ++ stack2Str xs
 Below is the definition of the `showVal` function, used to convert a **Value** data to string. This function is also used the `state2Str` function.
 
 ```haskell
--- Auxiliary function to extract the actual value from a Value data type
 showVal :: Value -> String
 showVal (MyInt intVal) = show intVal
 showVal (MyBool True)  = "True"
@@ -141,11 +139,9 @@ In addition to the above, we have also implemented some auxiliary functions to c
 The **State** functions also straightforward, however a little more complex. After converting the state to a string, it represents the state as an list of pairs variable-value, separated by commas and without spaces, with the pairs ordered in alphabetical order of the variable name. Each variable-value pair is represented without spaces and using an ”=”.
 
 ```haskell
--- Auxiliary function to create an empty stack
 createEmptyState :: State
 createEmptyState = []
 
--- Auxiliary function to convert the state to a string
 state2Str :: State -> String
 state2Str state = intercalate "," [var ++ "=" ++ showVal val | (var, val) <- sortedState]
   where
@@ -170,6 +166,8 @@ These data structures form the foundation for representing arithmetic expression
 
 #### Arithmetic Expressions
 
+The Aexp data type is used to model expressions that can contain variables, numeric constants, and the arithmetic operations of addition, subtraction, and multiplication.
+
 ```haskell
 -- Data type for arithmetic expressions
 data Aexp
@@ -182,6 +180,8 @@ data Aexp
 ```
 
 #### Boolean Expressions
+
+The Bexp data type is used to model expressions that can contain boolean values (TrueB and FalseB), boolean operations (like AndB for logical AND and NegB for negation), and comparison operations (like IntEqual for integer equality, BoolEqual for boolean equality, and LessEqual for less than or equal to comparison). 
 
 ```haskell
 -- Data type for boolean expressions
@@ -198,6 +198,9 @@ data Bexp
 
 #### Statements
 
+The Stm data type is used to model statements that can be an assignment (where a variable is assigned the result of an arithmetic expression), an if-then-else control flow (where based on a boolean expression, one of two lists of statements is executed), or a while loop (where a list of statements is repeatedly executed as long as a boolean expression evaluates to true).
+
+```haskell
 -- Data type for statements
 data Stm
   = Assign String Aexp          -- var := Aexp
@@ -207,33 +210,40 @@ data Stm
   | Aexp Aexp                   -- Arithmetic expression
   | Bexp Bexp                   -- Boolean expression
   deriving Show
+```
+
+#### Program
+
+The Program type is  a list of such statements, representing a sequence of operations or commands in a program.
+
+```haskell
+type Program = [Stm]
+```
 
 ### Compiler
 
-The main compiler function `compile :: [Stm] -> Code` compiples a list of statements (`Stm`) into machine code (`Code`). It relies on pattern matching to handle the various types of statements, including assignments, if-then-else statements, while loops, and standalone arithmetic or boolean expressions. This function depends on the auxiliar functions `compA :: Aexp -> Code` and `compB :: Bexp -> Code`, that with similar behaviour, are responsible for arithmetic and boolean expressions respectively.
+The main compiler function `compile :: [Stm] -> Code` compiles a list of statements (`Stm`) into machine code (`Code`). It relies on pattern matching to handle the various types of statements, including assignments, if-then-else statements, while loops, and standalone arithmetic or boolean expressions. This function depends on the auxiliar functions `compA :: Aexp -> Code` and `compB :: Bexp -> Code`, that with similar behaviour, are responsible for arithmetic and boolean expressions respectively.
 
 ```haskell
--- Compiler for statements (Stm) into machine instructions (Code)
-compile :: [Stm] -> Code
+compile :: Program  -> Code
 compile [] = []
 compile (stm:rest) = case stm of
-  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest 
+  Assign var aexp -> compA aexp ++ [Store var] ++ compile rest
   If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest 
-  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest 
-  Aexp aexp -> compA aexp ++ compile rest 
-  Bexp bexp -> compB bexp ++ compile rest 
+  While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest
 ```
 
 In the code above the function deconstructs a matching statement into the appropriate stack ordered machine code. Furthermore, it recursively calls on itself when a statement is comprised of other statements, and calls the boolean and arithmetic compiler when needed.
 
 ### Parser
 
+The parsing is done through a series of functions that build the abstract syntax tree (AST) of the program. 
+
 #### Lexer 
 
 The `lexer :: String -> [String]` function is an auxiliary component for parsing, it processes a given string and breaks it into a list of tokens (strings).
 
 ```haskell
--- Auxiliary function for parsing. Receives a string and splits it into a list of tokens (strings)
 lexer :: String -> [String]
 lexer [] = []
 lexer str
@@ -255,9 +265,7 @@ lexer str
     condition x = x `notElem` " ()=;=+-*<:"
 ```
 
-#### Parsing
-
-The parsing is done through a series of functions that build the abstract syntax tree (AST) of the program. 
+#### Parsing Functions 
 
 ##### buildData
 
@@ -267,10 +275,9 @@ It then splits the list into two parts before and after the semicolon, after thi
 
 ##### buildStm
 
-The buildStm function takes a list of tokens representing a statement and constructs the corresponding statement (`Stm`). Depending on the first token, it calls different functions (`buildIfStm`, `buildWhileStm`, `buildAssignStm`) to construct the specific type of statement.
+The buildStm function takes a list of tokens representing a statement and constructs the corresponding statement (`Stm`). Depending on the first token, it calls different procedures (`buildIfStm`, `buildWhileStm`, `buildAssignStm`) to construct the specific type of statement.
 
 ```haskell
--- Builds a statement from a list of tokens that were already separated by buildData
 buildStm :: [String] -> Stm
 buildStm list
   | head list == "if" = buildIfStm list
@@ -294,7 +301,7 @@ buildStm list
 
 ```
 
-Taking advantage of the nested `where` cases, we can differentiate the functionality of the function accordingly to the first character of the token list (`[String]`). Then it divides the token list accordingly (in 3 or 2 parts) and further builds the statement (`Stm`) using other build functions.
+Taking advantage of the nested `where` cases, we can differentiate the functionality of the function accordingly to the first character of the token list (`[String]`). Then, using the prelude function `break`, it divides the token list accordingly (in 3 or 2 parts) and further builds the statement (`Stm`) using other build functions.
 
 ##### buildAexp & buildBexp
 
@@ -307,7 +314,6 @@ They use the `findFirstNotNested` function to find the last operator that is not
 An essential function to the functionality of the above functions is the `findFirstNotNested :: [String] -> [String] -> Maybe Int` which is designed to find the index of the first token in a list of tokens that is not nested within parentheses or other specific constructs. 
 
 ```haskell
--- Auxiliary function to find the first token that's not nested in a list of tokens
 findFirstNotNested :: [String] -> [String] -> Maybe Int
 findFirstNotNested targets = find 0 0 
   where
@@ -320,7 +326,7 @@ findFirstNotNested targets = find 0 0
 
 ```
 
-The function makes use of a `depth` variable that acts as a counter to keep track of the level of nesting of the current traversal of input token, this value is increased when an opening parenthesis (`(`) or a `then` statement is encountered and decreased when a closing parentheses (`)`) or a `else` statement.
+The function makes use of a `depth` variable that acts as a counter to keep track of the level of nesting of the current traversal of input token, whose value is increased when an opening parenthesis (`(`) or a `then` statement is encountered and decreased when a closing parentheses (`)`) or a `else` statement.
 
 With this approach, when the depth is equal to 0 and the current token being analyzed is the same as the target one, the index of this token is returned.
 
@@ -328,10 +334,20 @@ With this approach, when the depth is equal to 0 and the current token being ana
 
 The `parse :: String -> [Stm]` function takes a string representing the program code and returns the parsed program, which is a list of statements (`[Stm]`).
 
+```haskell
+parse :: String -> Program 
+parse = buildData . lexer
+```
+
 It achieves this by first using the `lexer` function to tokenize the input string and then using the `buildData` function to build the AST of the program.
+
 
 ## Conclusions
 
-Overall the development of the program was enjoyable, the deadlines were achievable and the pratical lessons were very much helpful and ilustrative in regards to the project. We, as a group, feel we accomplished the features we proposed, and believe we were able to present well documented and organized code.
+In conclusion, this project provided a valuable opportunity to delve deeper into Haskell programming and its application in building a lexer and parser. The process of tokenizing an input string and building an Abstract Syntax Tree (AST) from it was both challenging and rewarding, and it offered practical insights into how programming languages are processed.
 
-Furthermore, it helped develop our Haskell skills and deepen our knowledge about its tricks and quirks.
+The project deadlines were reasonable, allowing for a thorough exploration of the problem space without undue pressure. The practical lessons were instrumental in guiding the project's direction and in clarifying complex concepts.
+
+The group worked effectively together, successfully implementing the proposed features and producing well-documented and organized code. This project not only enhanced our Haskell programming skills but also deepened our understanding of the language's unique features and quirks.
+
+Moving forward, we are excited to apply the knowledge and skills gained from this project to future challenges in programming language processing and other areas of software development.
