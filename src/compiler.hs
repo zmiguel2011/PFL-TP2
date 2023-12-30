@@ -32,8 +32,6 @@ compile (stm:rest) = case stm of
   Assign var aexp -> compA aexp ++ [Store var] ++ compile rest -- It will compile the arithmetic expression and store the result in the variable
   If bexp aexp1 aexp2 -> compB bexp ++ [Branch (compile aexp1) (compile aexp2)] ++ compile rest -- It will compile the boolean expression and branch to the statements of "then" or "else" depending on the result
   While bexp aexp -> Loop (compB bexp) (compile aexp) : compile rest -- It will compile the boolean expression and the statements of "do" and then loop them
-  Aexp aexp -> compA aexp ++ compile rest -- It will compile the arithmetic expression
-  Bexp bexp -> compB bexp ++ compile rest -- It will compile the boolean expression
 
 -- Auxiliary function for parsing. Receives a string and splits it into a list of tokens (strings)
 lexer :: String -> [String]

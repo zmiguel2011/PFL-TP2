@@ -78,9 +78,6 @@ data Stm
   = Assign String Aexp          -- Assignment: var := Aexp
   | If Bexp [Stm] [Stm]         -- If-then-else statement: if Bexp then Stm1 else Stm2
   | While Bexp [Stm]            -- While loop: while Bexp do Stm
-  | NoopStm                     -- No operation
-  | Aexp Aexp                   -- Arithmetic expression
-  | Bexp Bexp                   -- Boolean expression
   deriving Show
 
 type Program = [Stm]
