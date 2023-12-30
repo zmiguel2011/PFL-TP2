@@ -351,3 +351,9 @@ The project deadlines were reasonable, allowing for a thorough exploration of th
 The group worked effectively together, successfully implementing the proposed features and producing well-documented and organized code. This project not only enhanced our Haskell programming skills but also deepened our understanding of the language's unique features and quirks.
 
 Moving forward, we are excited to apply the knowledge and skills gained from this project to future challenges in programming language processing and other areas of software development.
+
+
+## Bibliography
+
+- GitHub Copilot
+- https://www.haskell.org
