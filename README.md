@@ -48,7 +48,7 @@
 - **Contribuition:** 
     - José Miguel Moreira Isidro: 50%
     - José António Santos Costa: 50%
-
+- [Project Assignment](Assignment.pdf)
 
 ## Installation and Execution
 
