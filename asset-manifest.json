@@ -1,0 +1,37 @@
+{
+  "files": {
+    "main.css": "/PFL-TP2/static/css/main.9914efbc.css",
+    "main.js": "/PFL-TP2/static/js/main.8731c556.js",
+    "static/js/787.6aabbb4f.chunk.js": "/PFL-TP2/static/js/787.6aabbb4f.chunk.js",
+    "static/media/banner-bg-white.png": "/PFL-TP2/static/media/banner-bg-white.7a65d67419c40058d58d.png",
+    "static/media/banner-bg.png": "/PFL-TP2/static/media/banner-bg.be74975758f421fdf280.png",
+    "static/media/footer-bg.png": "/PFL-TP2/static/media/footer-bg.ab4d56c0eb1dd56e0848.png",
+    "static/media/project-birdventure.png": "/PFL-TP2/static/media/project-birdventure.0756b0309d49eb5cd21a.png",
+    "static/media/before-footer-bg-white.png": "/PFL-TP2/static/media/before-footer-bg-white.b15bd89d0187b0779f0c.png",
+    "static/media/project-ventreplein.png": "/PFL-TP2/static/media/project-ventreplein.b5b612081bd03ea6defd.png",
+    "static/media/project-typeracer.png": "/PFL-TP2/static/media/project-typeracer.376dccad27f54a435d5e.png",
+    "static/media/project-letstalk.png": "/PFL-TP2/static/media/project-letstalk.5a85081cac47e9f1a2ed.png",
+    "static/media/project-claustro.png": "/PFL-TP2/static/media/project-claustro.cf5d840c5dd93d1e32bb.png",
+    "static/media/project-evup.png": "/PFL-TP2/static/media/project-evup.af3c97973abd12b1d777.png",
+    "static/media/project-linklayer.png": "/PFL-TP2/static/media/project-linklayer.597435c90fd0e77805ac.png",
+    "static/media/project-transpiler.png": "/PFL-TP2/static/media/project-transpiler.cdb5a1b56e2642d224be.png",
+    "static/media/before-footer-bg.png": "/PFL-TP2/static/media/before-footer-bg.dd43846ae83a2248cb9d.png",
+    "static/media/CentraNo2-Bold.ttf": "/PFL-TP2/static/media/CentraNo2-Bold.2faff7f7d3fc92a2fcd9.ttf",
+    "static/media/CentraNo2-Medium.ttf": "/PFL-TP2/static/media/CentraNo2-Medium.f94be5b326d78bb32b95.ttf",
+    "static/media/CentraNo2-Book.ttf": "/PFL-TP2/static/media/CentraNo2-Book.2b143fa4b734a3584043.ttf",
+    "static/media/project-spaceshooterultimate.png": "/PFL-TP2/static/media/project-spaceshooterultimate.50fb26e96605fbe318dd.png",
+    "static/media/logo.png": "/PFL-TP2/static/media/logo.ef2de886253693d44684.png",
+    "static/media/github-icon.svg": "/PFL-TP2/static/media/github-icon.fd617df669484a3727a0c20ef4be4af7.svg",
+    "index.html": "/PFL-TP2/index.html",
+    "static/media/code-icon.svg": "/PFL-TP2/static/media/code-icon.2e88e78e4aca08959c0999e44c1dfb33.svg",
+    "static/media/linkedin-icon.svg": "/PFL-TP2/static/media/linkedin-icon.721d5414c26365f117e71d46b6641cb2.svg",
+    "static/media/mail-icon.svg": "/PFL-TP2/static/media/mail-icon.129a9bb6f39d8d3278c84d7f8bb6a114.svg",
+    "main.9914efbc.css.map": "/PFL-TP2/static/css/main.9914efbc.css.map",
+    "main.8731c556.js.map": "/PFL-TP2/static/js/main.8731c556.js.map",
+    "787.6aabbb4f.chunk.js.map": "/PFL-TP2/static/js/787.6aabbb4f.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.9914efbc.css",
+    "static/js/main.8731c556.js"
+  ]
+}
